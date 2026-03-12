@@ -1,0 +1,41 @@
+services:
+  api:
+    build:
+      context: .
+      target: production
+    container_name: auth_api_prod
+    env_file:
+      - .prod.env
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "3002:3000"
+    restart: always
+
+  postgres:
+    image: postgres:17
+    container_name: auth_postgres_prod
+    environment:
+      POSTGRES_DB: auth_prod_db
+      POSTGRES_USER: prod_user
+      POSTGRES_PASSWORD: secure_password
+    ports:
+      - "5434:5432"
+    volumes:
+      - postgres_prod_data:/var/lib/postgresql/data
+    restart: always
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U prod_user -d auth_prod_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+  pgadmin:
+    image: dpage/pgadmin4
+    environment:
+      PGADMIN_DEFAULT_EMAIL: root@admin.com
+      PGADMIN_DEFAULT_PASSWORD: root
+    ports: 
+      - "5052:80"
+volumes:
+  postgres_prod_data:
