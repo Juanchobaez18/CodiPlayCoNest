@@ -11,6 +11,8 @@ import { RolesModule } from './roles/roles.module';
 import { PermissionsModule } from './permissions/permissions.module';
 import { AuthModule } from './auth/auth.module';
 import { ModulesModule } from './modules/modules.module';
+import { DocenteModule } from './docente/docente.module';
+import { EstudiantesModule } from './estudiantes/estudiantes.module';
 import config from './config';
 
 @Module({
@@ -35,6 +37,8 @@ import config from './config';
     RolesModule,
     PermissionsModule,
     ModulesModule,
+    DocenteModule,
+    EstudiantesModule,
   ],
   controllers: [AppController],
   providers: [AppService],

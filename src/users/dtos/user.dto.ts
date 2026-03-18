@@ -39,6 +39,11 @@ export class CreateUserDto {
     @ApiProperty()
     readonly isActive: boolean;
 
+    @IsString()
+    @IsNotEmpty()
+    @ApiProperty()
+    readonly avatar: string;
+
     @IsArray()
     @ArrayNotEmpty()
     @IsInt({ each: true })
