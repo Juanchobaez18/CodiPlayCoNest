@@ -2,9 +2,10 @@ import { Entity,
     PrimaryGeneratedColumn, 
     Column, 
     OneToOne, 
-    JoinColumn } from 'typeorm';
+    JoinColumn,
+  OneToMany } from 'typeorm';
 import { User } from '../../users/entities/user.entity';
-
+import { Curso } from 'src/curso/entity/curso.entity/curso.entity';
 @Entity()
 export class Docente {
 
@@ -20,4 +21,7 @@ export class Docente {
   @OneToOne(() => User, (user) => user.docente)
   @JoinColumn() // 🔥 aquí se crea la FK
   user: User;
+
+  @OneToMany(() => Curso, (curso) => curso.docente)
+cursos: Curso[];
 }
