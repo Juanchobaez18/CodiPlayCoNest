@@ -13,6 +13,7 @@ import { AuthModule } from './auth/auth.module';
 import { ModulesModule } from './modules/modules.module';
 import { DocenteModule } from './docente/docente.module';
 import { EstudiantesModule } from './estudiantes/estudiantes.module';
+import { CursoModule } from './curso/curso.module';
 import config from './config';
 
 @Module({
@@ -39,6 +40,7 @@ import config from './config';
     ModulesModule,
     DocenteModule,
     EstudiantesModule,
+    CursoModule,
   ],
   controllers: [AppController],
   providers: [AppService],
