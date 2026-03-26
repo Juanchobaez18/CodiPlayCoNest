@@ -6,10 +6,12 @@ import {
   ManyToMany,
   JoinColumn,
   JoinTable,
+  OneToMany,
 } from 'typeorm';
 
 import { Docente } from 'src/docente/entities/docente.entity';
 import { Estudiante } from 'src/estudiantes/entities/estudiantes.entity';
+import { Transaction } from 'src/payments/entities/transaction.entity';
 
 @Entity()
 export class Curso {
@@ -50,4 +52,8 @@ export class Curso {
     },
   })
   estudiantes: Estudiante[];
+
+  // 🔹 Relación: muchas transacciones → un curso
+  @OneToMany(() => Transaction, (transaction) => transaction.curso)
+  transactions: Transaction[];
 }
