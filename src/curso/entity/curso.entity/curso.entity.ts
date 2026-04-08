@@ -55,4 +55,8 @@ export class Curso {
     },
   })
   estudiantes: Estudiante[];
+
+  // 🔹 Relación: muchas transacciones → un curso
+  @OneToMany(() => Transaction, (transaction) => transaction.curso)
+  transactions: Transaction[];
 }
