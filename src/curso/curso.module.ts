@@ -9,5 +9,6 @@ import { CursoController } from 'src/curso/controller/curso/curso.controller';
   imports: [TypeOrmModule.forFeature([Curso])],
   controllers: [CursoController],
   providers: [CursoService],
+  exports: [CursoService] // 🔥 ESTO FALTABA
 })
 export class CursoModule {}

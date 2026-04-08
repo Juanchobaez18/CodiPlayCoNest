@@ -6,10 +6,12 @@ import {
   ManyToMany,
   JoinColumn,
   JoinTable,
+  OneToMany,
 } from 'typeorm';
 
 import { Docente } from 'src/docente/entities/docente.entity';
 import { Estudiante } from 'src/estudiantes/entities/estudiantes.entity';
+import { Modulos } from 'src/modulos/entities/modulos.entity';
 
 @Entity()
 export class Curso {
@@ -35,6 +37,9 @@ export class Curso {
   @ManyToOne(() => Docente, (docente) => docente.cursos)
   @JoinColumn({ name: 'docente_id' })
   docente: Docente;
+
+  @OneToMany(() => Modulos, (modulos) => modulos.curso)
+ modulos: Modulos[];
 
   // 🔹 Relación: muchos cursos ↔ muchos estudiantes
   @ManyToMany(() => Estudiante, (estudiante) => estudiante.cursos)
