@@ -1,68 +1,75 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { CreateLeccionesDto } from 'src/lecciones/dtos/lecciones.dto';
-import { Lecciones } from 'src/lecciones/entities/lecciones.entity';
-import { CreateUserDto } from 'src/users/dtos/user.dto';
 import { Repository } from 'typeorm';
+
+import { Lecciones } from 'src/lecciones/entities/lecciones.entity';
+import { CreateLeccionesDto, UpdateLeccionesDto } from 'src/lecciones/dtos/lecciones.dto';
+import { ModulosService } from 'src/modulos/service/modulos/modulos.service';
+
 
 @Injectable()
 export class LeccionesService {
 
-    lecciones: Lecciones[] = [];
-    constructor(
-        @InjectRepository(Lecciones) private leccionesRepo: Repository<Lecciones>,
-        private leccionesService: LeccionesService,
-    ){}
+  constructor(
+    @InjectRepository(Lecciones)
+    private leccionesRepo: Repository<Lecciones>,
 
-    async findAll(){
-        return await this.leccionesRepo.find({ relations: ['modulos']})
-    }
+    private moduloService: ModulosService, // 🔥 CORRECTO
+  ) {}
 
-
-async findByEmail(email:string) {
-    const lecciones = await this.leccionesRepo.findOne({
-        where: { email },
-        relations: {
-            modulos:{
-             modules: true,
-        },
-    },
+  async findAll() {
+    return await this.leccionesRepo.find({
+      relations: ['modulo'], // 🔥 singular
     });
-    if (!lecciones){
-        throw new NotFoundException('Lecciones ${email} not found');
-    }
-    return lecciones;
-}
+  }
 
-async findOne(leccionesId: number){
-    const lecciones = await this.leccionesRepo.findOne({
-        where: { id: leccionesId },
-        relations: []
-        });
-        if (!lecciones){
-            throw new NotFoundException('Lecciones #${leccionesId} not found');
-        }
-        return lecciones;
-}
-
-async create(createLeccionesDto: CreateLeccionesDto){
-    const {moduloIds, ...leccionesData} = createLeccionesDto;
-    const lecciones = this.leccionesRepo.create(leccionesData);
-    const modulos = await this.leccionesService.findByIds(moduloIds);
-
-    if(modulos.length !== moduloIds.length){
-        throw new NotFoundException('One or more modulos not found');
-    }
-    const newLecciones = this.leccionesRepo.create({
-        ...leccionesData,
-        modulos,
+  async findOne(leccionesId: number) {
+    const leccion = await this.leccionesRepo.findOne({
+      where: { id: leccionesId },
+      relations: ['modulo'],
     });
-        return await this.leccionesRepo.save(newLecciones);
-}
- 
-deleteLecciones(leccionesId: number){
-    return this.leccionesRepo.delete(leccionesId);  
-}
+
+    if (!leccion) {
+      throw new NotFoundException(`Leccion #${leccionesId} not found`);
+    }
+
+    return leccion;
+  }
+
+  async create(createLeccionesDto: CreateLeccionesDto) {
+    const { moduloId, ...leccionesData } = createLeccionesDto;
+    // validar modulo
+    const modulo = await this.moduloService.findOne(moduloId);
+    if (!modulo) {
+      throw new NotFoundException(`Modulo #${moduloId} not found`);
+    }
+    const leccion = this.leccionesRepo.create({
+      ...leccionesData,
+      modulo: modulo as any,
+
+    });
+    return this.leccionesRepo.save(leccion);
+  }
+
+ async update(id: number, updateDto: UpdateLeccionesDto) {
+
+    const leccion = await this.findOne(id);
+
+    const { moduloId, ...leccionesData } = updateDto;
+
+    if (moduloId) {
+      const modulo = await this.moduloService.findOne(moduloId);
+      leccion.modulo = modulo as any;
+    }
+
+    this.leccionesRepo.merge(leccion, leccionesData);
+
+    return this.leccionesRepo.save(leccion);
+  }
 
 
+
+  async deleteLecciones(leccionesId: number) {
+    return this.leccionesRepo.delete(leccionesId);
+  }
 }
