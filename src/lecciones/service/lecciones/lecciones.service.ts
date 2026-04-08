@@ -51,11 +51,11 @@ export class LeccionesService {
     return this.leccionesRepo.save(leccion);
   }
 
- async update(id: number, updateDto: UpdateLeccionesDto) {
+ async update(id: number, updateLecciones: UpdateLeccionesDto) {
 
     const leccion = await this.findOne(id);
 
-    const { moduloId, ...leccionesData } = updateDto;
+    const { moduloId, ...leccionesData } = updateLecciones;
 
     if (moduloId) {
       const modulo = await this.moduloService.findOne(moduloId);

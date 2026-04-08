@@ -30,11 +30,10 @@ createLecciones(@Body() payload: CreateLeccionesDto){
     return this.leccionesService.create(payload);   
 }
 
-@Put()
+@Put(':leccionesId')
 updateLecciones(@Param('leccionesId', ParseIntPipe) leccionesId: number, @Body() payloadUpdate: UpdateLeccionesDto){
-    return this.leccionesService.updateLecciones(leccionesId, payloadUpdate);
+    return this.leccionesService.update(leccionesId, payloadUpdate);
 }
-
 @Delete(':leccionesId')
 deleteLecciones(@Param('leccionesId', ParseIntPipe) leccionesId: number){
     this.leccionesService.deleteLecciones(leccionesId);  
