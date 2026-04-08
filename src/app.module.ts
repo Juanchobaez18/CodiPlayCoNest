@@ -14,8 +14,7 @@ import { ModulesModule } from './modules/modules.module';
 import { DocenteModule } from './docente/docente.module';
 import { EstudiantesModule } from './estudiantes/estudiantes.module';
 import { CursoModule } from './curso/curso.module';
-import { PaymentsModule } from './payments/payments.module';
-import { LeccionesModule } from './lecciones/lecciones.module';
+import { ModulosModule } from './modulos/modulos.module';
 import config from './config';
 
 @Module({
@@ -43,8 +42,7 @@ import config from './config';
     DocenteModule,
     EstudiantesModule,
     CursoModule,
-    PaymentsModule,
-    LeccionesModule,
+    ModulosModule,
   ],
   controllers: [AppController],
   providers: [AppService],
