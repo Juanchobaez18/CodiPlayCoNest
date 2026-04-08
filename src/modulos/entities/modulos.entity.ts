@@ -1,8 +1,10 @@
 import { Curso } from 'src/curso/entity/curso.entity/curso.entity';
+import { Lecciones } from 'src/lecciones/entities/lecciones.entity';
 import { Entity, 
     PrimaryGeneratedColumn, 
     Column,
-    ManyToOne, 
+    ManyToOne,
+    OneToMany, 
 } from 'typeorm';
 
 
@@ -30,5 +32,7 @@ fechacompletado: string;
 @ManyToOne(() => Curso, (curso) => curso.modulos)
 curso: Curso;
 
+@OneToMany(() => Lecciones, leccion => leccion.modulo)
+lecciones: Lecciones[];
 
 }

@@ -1,23 +1,29 @@
 import { ApiProperty, PartialType } from "@nestjs/swagger";
-import { isString } from "class-validator";
+import { IsNumber, IsString, isString } from "class-validator";
 import { string } from "joi";
 
 export class CreateLeccionesDto {
-@isString()
+@IsString()
 @ApiProperty()
 titulo: string;
 
-@isString()
+@IsString()
 @ApiProperty()
 descripcion: string;
 
-@isString()
+@IsString()
 @ApiProperty()
 contenido: string;
 
-@isString()
+@IsString()
 @ApiProperty()
 orden: string;
+
+  // 🔥 clave para relacionar con modulo
+  @IsNumber()
+  moduloId: number;
 }
+
+
 
 export class UpdateLeccionesDto extends PartialType(CreateLeccionesDto) { }

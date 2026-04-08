@@ -1,4 +1,5 @@
-import { Column, Entity, PrimaryGeneratedColumn } from "typeorm";
+import { Modulos } from "src/modulos/entities/modulos.entity";
+import { Column, Entity, ManyToOne, PrimaryGeneratedColumn } from "typeorm";
 
 @Entity()
 export class Lecciones {
@@ -14,4 +15,6 @@ export class Lecciones {
         @Column()
         orden: string;
 
+@ManyToOne(() => Modulos, modulos => modulos.lecciones)
+modulo: Modulos[];
 }
