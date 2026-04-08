@@ -5,7 +5,7 @@ export class CreateCursoDto {
 
 @ApiProperty()
 @IsString()
-  nombre: string;
+nombre: string;
 
   @ApiProperty()
   @IsString()
