@@ -16,8 +16,11 @@ import {
 import { PaymentsService } from '../services/payments.service';
 import { JwtAuthGuard } from '../../auth/guards/auth.guard';
 import { ModulesGuard } from '../../auth/guards/modules.guard.guard';
+import { RolesGuard } from '../../auth/guards/roles.guard';
 import { Modules } from '../../auth/decorators/modules.decorator';
+import { Roles } from '../../auth/decorators/roles.decorator';
 import { CreatePaymentDto } from '../dtos/create-payment.dto';
+import { UpdatePaymentDto } from '../dtos/update-payment.dto';
 import { Transaction, TransactionStatus } from '../entities/transaction.entity';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 
@@ -39,8 +42,9 @@ export class PaymentsController {
     @Body() createPaymentDto: CreatePaymentDto,
     @Request() req,
   ): Promise<Transaction> {
-    const estudianteId = req.user.sub;
-    return await this.paymentsService.create(estudianteId, createPaymentDto);
+    // req.user es el objeto User completo que devuelve JwtStrategy.validate()
+    const userId = req.user.id;
+    return await this.paymentsService.create(userId, createPaymentDto);
   }
 
   /**
@@ -55,20 +59,21 @@ export class PaymentsController {
     @Query('page') page: string = '1',
     @Query('limit') limit: string = '10',
   ) {
-    const estudianteId = req.user.sub;
+    const userId = req.user.id;
     return await this.paymentsService.getByStudent(
-      estudianteId,
+      userId,
       parseInt(page),
       parseInt(limit),
     );
   }
 
   /**
-   * GET /payments/admin/all - Obtener TODAS las transacciones (admin)
+   * GET /payments/admin/all - Obtener TODAS las transacciones (solo admin)
    */
   @Get('admin/all')
-  @UseGuards(JwtAuthGuard, ModulesGuard)
+  @UseGuards(JwtAuthGuard, ModulesGuard, RolesGuard)
   @Modules('payments')
+  @Roles('admin')
   @ApiOperation({ summary: 'Obtener todas las transacciones (Admin)' })
   async getAllTransactions(
     @Query('page') page: string = '1',
@@ -109,9 +114,9 @@ export class PaymentsController {
   @ApiOperation({ summary: 'Actualizar transacción (status, amount, metadata)' })
   async update(
     @Param('id', ParseIntPipe) id: number,
-    @Body() updateData: Partial<Transaction>,
+    @Body() updatePaymentDto: UpdatePaymentDto,
   ): Promise<Transaction> {
-    return await this.paymentsService.update(id, updateData);
+    return await this.paymentsService.update(id, updatePaymentDto);
   }
 
   /**
