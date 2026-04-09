@@ -16,6 +16,7 @@ import { EstudiantesModule } from './estudiantes/estudiantes.module';
 import { CursoModule } from './curso/curso.module';
 import { ModulosModule } from './modulos/modulos.module';
 import config from './config';
+import { PaymentsModule } from './payments/payments.module';
 
 @Module({
   imports: [
@@ -38,6 +39,7 @@ import config from './config';
     UsersModule,
     RolesModule,
     PermissionsModule,
+    PaymentsModule,
     ModulesModule,
     DocenteModule,
     EstudiantesModule,

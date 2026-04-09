@@ -26,14 +26,14 @@ export class Transaction {
   @Column({ type: 'int' })
   estudianteId!: number;
 
-  @ManyToOne(() => Estudiante, { eager: false })
-  estudiante!: Estudiante;
+@ManyToOne(() => Estudiante, (estudiante) => estudiante.transactions)
+estudiante: Estudiante;
 
   @Column({ type: 'int' })
   cursoId!: number;
 
-  @ManyToOne(() => Curso, { eager: false })
-  curso!: Curso;
+  @ManyToOne(() => Curso, (curso) => curso.transactions, { eager: false })
+curso!: Curso;
 
   @Column({ type: 'decimal', precision: 10, scale: 2 })
   amount!: number;

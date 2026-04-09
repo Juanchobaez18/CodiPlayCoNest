@@ -1,19 +1,19 @@
-import { Module } from '@nestjs/common';
+import { forwardRef, Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-
-import { ModulosService }  from './service/modulos/modulos.service';
-import { ModulosController } from './controller/modulos/modulos.controller';
-import { CursoModule } from 'src/curso/curso.module';
-import { Modulos } from './entities/modulos.entity';
 import { LeccionesModule } from 'src/lecciones/lecciones.module';
+import { Modulos } from './entities/modulos.entity';
+import { CursoModule } from 'src/curso/curso.module';
+import { ModulosController } from './controller/modulos/modulos.controller';
+import { ModulosService } from './service/modulos/modulos.service';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([Modulos]),
-    CursoModule, // 🔥 para usar CursoService
-    LeccionesModule
+    CursoModule,
+    forwardRef(() => LeccionesModule),
   ],
   controllers: [ModulosController],
   providers: [ModulosService],
+  exports: [ModulosService], // 🔥 ESTA LÍNEA ES LA CLAVE
 })
 export class ModulosModule {}
