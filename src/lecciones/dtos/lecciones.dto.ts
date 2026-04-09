@@ -20,10 +20,7 @@ contenido: string;
 orden: string;
 
   // 🔥 clave para relacionar con modulo
-  @IsNumber()
-  moduloId: number;
+@IsNumber()
+moduloId: number;
 }
-
-
-
-export class UpdateLeccionesDto extends PartialType(CreateLeccionesDto) { }
+export class UpdateLeccionesDto extends PartialType(CreateLeccionesDto) {}
