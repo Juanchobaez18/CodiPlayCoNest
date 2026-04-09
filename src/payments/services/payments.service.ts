@@ -7,29 +7,45 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Transaction, TransactionStatus } from '../entities/transaction.entity';
 import { CreatePaymentDto } from '../dtos/create-payment.dto';
+import { UpdatePaymentDto } from '../dtos/update-payment.dto';
+import { Estudiante } from '../../estudiantes/entities/estudiantes.entity';
 
 @Injectable()
 export class PaymentsService {
   constructor(
     @InjectRepository(Transaction)
     private transactionRepository: Repository<Transaction>,
+    @InjectRepository(Estudiante)
+    private estudianteRepository: Repository<Estudiante>,
   ) {}
+
+  /**
+   * Busca el Estudiante asociado a un User.
+   * El JWT guarda el User.id, pero la tabla transactions usa Estudiante.id.
+   */
+  private async findEstudianteByUserId(userId: number): Promise<Estudiante> {
+    const estudiante = await this.estudianteRepository.findOne({
+      where: { user: { id: userId } },
+    });
+    if (!estudiante) {
+      throw new BadRequestException(
+        `El usuario #${userId} no tiene un perfil de estudiante asignado`,
+      );
+    }
+    return estudiante;
+  }
 
   /**
    * CREATE: Crea una nueva transacción de pago
    */
   async create(
-    estudianteId: number,
+    userId: number,
     createPaymentDto: CreatePaymentDto,
   ): Promise<Transaction> {
-    if (!createPaymentDto.courseId || !createPaymentDto.amount) {
-      throw new BadRequestException(
-        'courseId and amount are required',
-      );
-    }
+    const estudiante = await this.findEstudianteByUserId(userId);
 
     const transaction = this.transactionRepository.create({
-      estudianteId,
+      estudianteId: estudiante.id,
       cursoId: createPaymentDto.courseId,
       amount: createPaymentDto.amount,
       currency: 'USD',
@@ -43,7 +59,7 @@ export class PaymentsService {
    * READ: Obtiene todas las transacciones del estudiante autenticado
    */
   async getByStudent(
-    estudianteId: number,
+    userId: number,
     page: number = 1,
     limit: number = 10,
   ): Promise<{
@@ -52,10 +68,11 @@ export class PaymentsService {
     page: number;
     limit: number;
   }> {
+    const estudiante = await this.findEstudianteByUserId(userId);
     const skip = (page - 1) * limit;
 
     const [data, total] = await this.transactionRepository.findAndCount({
-      where: { estudianteId },
+      where: { estudianteId: estudiante.id },
       order: { createdAt: 'DESC' },
       skip,
       take: limit,
@@ -80,21 +97,18 @@ export class PaymentsService {
   }
 
   /**
-   * UPDATE: Actualiza una transacción
+   * UPDATE: Actualiza solo los campos permitidos de una transacción
    */
-  async update(
-    id: number,
-    updateData: Partial<Transaction>,
-  ): Promise<Transaction> {
+  async update(id: number, updateData: UpdatePaymentDto): Promise<Transaction> {
     const transaction = await this.findOne(id);
 
-    if (updateData.status) {
+    if (updateData.status !== undefined) {
       transaction.status = updateData.status;
     }
-    if (updateData.amount) {
+    if (updateData.amount !== undefined) {
       transaction.amount = updateData.amount;
     }
-    if (updateData.metadata) {
+    if (updateData.metadata !== undefined) {
       transaction.metadata = updateData.metadata;
     }
 
