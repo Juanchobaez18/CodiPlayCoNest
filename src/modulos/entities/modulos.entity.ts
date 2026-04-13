@@ -1,10 +1,13 @@
 import { Curso } from 'src/curso/entity/curso.entity/curso.entity';
 import { Lecciones } from 'src/lecciones/entities/lecciones.entity';
+import { Forum } from '../../foros/entities/forum.entity';
 import { Entity, 
     PrimaryGeneratedColumn, 
     Column,
     ManyToOne,
-    OneToMany, 
+    OneToMany,
+    OneToOne,
+    JoinColumn,
 } from 'typeorm';
 
 
@@ -34,5 +37,8 @@ curso: Curso;
 
 @OneToMany(() => Lecciones, leccion => leccion.modulo)
 lecciones: Lecciones[];
+
+@OneToOne(() => Forum, forum => forum.modulo)
+forum: Forum;
 
 }
