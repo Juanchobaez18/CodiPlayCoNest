@@ -15,6 +15,7 @@ import { DocenteModule } from './docente/docente.module';
 import { EstudiantesModule } from './estudiantes/estudiantes.module';
 import { CursoModule } from './curso/curso.module';
 import { ModulosModule } from './modulos/modulos.module';
+import { MensajesModule } from './mensajes/mensajes.module';
 import config from './config';
 import { PaymentsModule } from './payments/payments.module';
 
@@ -45,6 +46,7 @@ import { PaymentsModule } from './payments/payments.module';
     EstudiantesModule,
     CursoModule,
     ModulosModule,
+    MensajesModule,
   ],
   controllers: [AppController],
   providers: [AppService],
