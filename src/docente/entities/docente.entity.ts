@@ -6,7 +6,7 @@ import { Entity,
   OneToMany } from 'typeorm';
 import { User } from '../../users/entities/user.entity';
 import { Curso } from 'src/curso/entity/curso.entity/curso.entity';
-import { Mensaje } from 'src/mensajes/entities/mensaje.entity';
+import { Forum } from '../../foros/entities/forum.entity';
 
 @Entity()
 export class Docente {
@@ -21,15 +21,12 @@ export class Docente {
   pagos: number;
 
   @OneToOne(() => User, (user) => user.docente)
-  @JoinColumn() // 🔥 aquí se crea la FK
+  @JoinColumn() // aquí se crea la FK
   user: User;
 
   @OneToMany(() => Curso, (curso) => curso.docente)
-cursos: Curso[];
+  cursos: Curso[];
 
-// Relacion con mensajes
-
-
-  @OneToMany(() => Mensaje, (mensaje) => mensaje.docente)
-  mensajes: Mensaje[];
+  @OneToMany(() => Forum, forum => forum.docente)
+  foros: Forum[];
 }

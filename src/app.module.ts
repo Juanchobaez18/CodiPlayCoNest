@@ -18,6 +18,7 @@ import { ModulosModule } from './modulos/modulos.module';
 import { MensajesModule } from './mensajes/mensajes.module';
 import config from './config';
 import { PaymentsModule } from './payments/payments.module';
+import { ForosModule } from './foros/foros.module';
 
 @Module({
   imports: [
@@ -46,7 +47,7 @@ import { PaymentsModule } from './payments/payments.module';
     EstudiantesModule,
     CursoModule,
     ModulosModule,
-    MensajesModule,
+    ForosModule,
   ],
   controllers: [AppController],
   providers: [AppService],
