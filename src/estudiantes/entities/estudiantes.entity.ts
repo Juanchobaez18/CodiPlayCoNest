@@ -2,6 +2,7 @@ import { Entity, PrimaryGeneratedColumn, Column, OneToOne, JoinColumn, ManyToMan
 import { User } from '../../users/entities/user.entity';
 import { Curso } from 'src/curso/entity/curso.entity/curso.entity';
 import { Transaction } from 'src/payments/entities/transaction.entity';
+import { Mensaje } from '../../mensajes/entities/mensaje.entity';
 
 @Entity()
 export class Estudiante {
@@ -27,4 +28,9 @@ export class Estudiante {
 
   @OneToMany(() => Transaction, (transaction) => transaction.estudiante)
   transactions: Transaction[];
+
+  // Relacion con mensajes
+
+    @OneToMany(() => Mensaje, (mensaje) => mensaje.estudiante)
+  mensajes: Mensaje[];
 }
