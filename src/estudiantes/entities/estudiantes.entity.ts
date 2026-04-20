@@ -3,6 +3,7 @@ import { User } from '../../users/entities/user.entity';
 import { Curso } from 'src/curso/entity/curso.entity/curso.entity';
 import { Transaction } from 'src/payments/entities/transaction.entity';
 import { Forum } from '../../foros/entities/forum.entity';
+import { Mensaje } from 'src/mensajes/entities/mensaje.entity';
 
 @Entity()
 export class Estudiante {
@@ -31,4 +32,7 @@ export class Estudiante {
 
   @ManyToMany(() => Forum, (forum) => forum.estudiantes)
   foros: Forum[];
+
+  @OneToMany(() => Mensaje, (mensaje) => mensaje.estudiante)
+  mensajes: Mensaje[];
 }

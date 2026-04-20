@@ -8,6 +8,8 @@ import { UserModel } from '../../users/interfaces/user';
 @Injectable()
 export class AuthService {
 
+    
+
     constructor(
         private readonly usersService: UsersService,
         private readonly jwtService: JwtService,
@@ -38,11 +40,18 @@ export class AuthService {
         };
     }
 
-    // async login(user: UserModel) {
-    //     const payload = { sub: user.id, email: user.email };
-    //     return {
-    //         access_token: this.jwtService.sign(payload),
-    //     };
-    // }
+    // auth.service.ts
 
+    async checkStatus(user: any) {
+        // Usamos 'sub' para que la estrategia pueda encontrarlo después
+        const payload = {
+            sub: user.sub,
+            email: user.email
+        };
+
+        return {
+            user: user,
+            access_token: this.jwtService.sign(payload), // Generamos el token con 'sub'
+        };
+    }
 }

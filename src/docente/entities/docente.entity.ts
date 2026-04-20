@@ -7,6 +7,7 @@ import { Entity,
 import { User } from '../../users/entities/user.entity';
 import { Curso } from 'src/curso/entity/curso.entity/curso.entity';
 import { Forum } from '../../foros/entities/forum.entity';
+import { Mensaje } from 'src/mensajes/entities/mensaje.entity';
 
 @Entity()
 export class Docente {
@@ -29,4 +30,7 @@ export class Docente {
 
   @OneToMany(() => Forum, forum => forum.docente)
   foros: Forum[];
+
+  @OneToMany(() => Mensaje, (mensaje) => mensaje.docente)
+  mensajes: Mensaje[];
 }

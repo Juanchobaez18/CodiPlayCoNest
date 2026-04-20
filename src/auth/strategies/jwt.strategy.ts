@@ -1,31 +1,35 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
+import { Injectable, Inject, UnauthorizedException } from '@nestjs/common'; // Añade Inject
 import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
-import { UsersService } from '../../users/services/users/users.service'; // ajusta según tu estructura
+import type { ConfigType } from '@nestjs/config'; // Importa ConfigType
+import config from '../../config'; // Importa tu archivo de configuración
+import { UsersService } from '../../users/services/users/users.service';
 import { JwtPayload } from '../interfaces/jwt-payload.interface';
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
   constructor(
-    private configService: ConfigService,
+    //Cambiamos ConfigService por la inyección directa de tu ConfigType
+    @Inject(config.KEY) configType: ConfigType<typeof config>,
     private userService: UsersService,
   ) {
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
-      secretOrKey: configService.get<string>('config.jwt.secret')!,
+      ignoreExpiration: false,
+      //Accedemos igual que en el AuthModule
+      secretOrKey: configType.jwt.secret!, 
     });
   }
 
   async validate(payload: JwtPayload) {
-    // ✅ Buscar usuario con roles y módulos
+    // payload.sub es el ID que viene en el token
     const user = await this.userService.findOne(payload.sub);
+    
     if (!user) {
       throw new UnauthorizedException('User not found');
     }
-    // ❌ Excluimos la contraseña
+
     const { password, ...result } = user;
-    // Esto se asigna a req.user y puede usarse en guards
     return result;
   }
 }
