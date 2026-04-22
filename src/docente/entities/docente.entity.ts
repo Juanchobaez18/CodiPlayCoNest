@@ -7,6 +7,8 @@ import { Entity,
 import { User } from '../../users/entities/user.entity';
 import { Curso } from 'src/curso/entity/curso.entity/curso.entity';
 import { Forum } from '../../foros/entities/forum.entity';
+import { Mensaje } from 'src/mensajes/entities/mensaje.entity';
+import { ForoRespuesta } from 'src/foros/entities/foro_respuesta.entity';
 
 @Entity()
 export class Docente {
@@ -21,7 +23,7 @@ export class Docente {
   pagos: number;
 
   @OneToOne(() => User, (user) => user.docente)
-  @JoinColumn() // aquí se crea la FK
+  @JoinColumn()
   user: User;
 
   @OneToMany(() => Curso, (curso) => curso.docente)
@@ -29,4 +31,10 @@ export class Docente {
 
   @OneToMany(() => Forum, forum => forum.docente)
   foros: Forum[];
+
+  @OneToMany(() => Mensaje, (mensaje) => mensaje.docente)
+  mensajes: Mensaje[];
+
+  @OneToMany(() => ForoRespuesta, (respuesta) => respuesta.docente)
+foroRespuestas: ForoRespuesta[];
 }

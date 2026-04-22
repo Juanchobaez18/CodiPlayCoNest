@@ -1,7 +1,7 @@
 import { Entity, PrimaryGeneratedColumn, Column, ManyToOne } from 'typeorm';
 import { Estudiante } from 'src/estudiantes/entities/estudiantes.entity';
 import { Docente } from 'src/docente/entities/docente.entity';
-import { RemitenteTipo, MensajeEstado } from 'src/mensajes/dto/crear-mensaje.dto';
+import { RemitenteTipo, MensajeEstado } from 'src/mensajes/dto/crear-mensaje.dto'; 
 
 @Entity('mensajes')
 export class Mensaje {
