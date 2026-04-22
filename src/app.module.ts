@@ -48,7 +48,7 @@ import { ForosModule } from './foros/foros.module';
     CursoModule,
     ModulosModule,
     ForosModule,
-    MensajesModule
+    MensajesModule,
   ],
   controllers: [AppController],
   providers: [AppService],

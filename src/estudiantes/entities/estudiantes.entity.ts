@@ -3,8 +3,8 @@ import { User } from '../../users/entities/user.entity';
 import { Curso } from 'src/curso/entity/curso.entity/curso.entity';
 import { Transaction } from 'src/payments/entities/transaction.entity';
 import { Forum } from '../../foros/entities/forum.entity';
-import { Mensaje } from 'src/mensajes/entities/mensaje.entity';
-import { ForoRespuesta } from 'src/foros/entities/foro_respuesta.entity';
+import { Mensaje } from '../../mensajes/entities/mensaje.entity';
+import { ForoRespuesta } from '../../foros/entities/foro_respuesta.entity';
 
 @Entity()
 export class Estudiante {
@@ -38,5 +38,5 @@ export class Estudiante {
   mensajes: Mensaje[];
 
   @OneToMany(() => ForoRespuesta, (respuesta) => respuesta.estudiante)
-foroRespuestas: ForoRespuesta[];
+  foroRespuestas: ForoRespuesta[];
 }
