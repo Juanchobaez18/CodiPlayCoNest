@@ -38,6 +38,20 @@ export class AuthService {
         };
     }
 
+    async checkStatus(user: UserModel){
+        const id = user.id;
+
+        const dbUser = await this.usersService.findOne(id);
+        if (!dbUser) throw new UnauthorizedException();
+
+        const payload = {sub: dbUser.id, email: dbUser.email}
+
+        return {
+            user: dbUser,
+            access_token: this.jwtService.sign(payload),
+        }
+    }
+
     // async login(user: UserModel) {
     //     const payload = { sub: user.id, email: user.email };
     //     return {
