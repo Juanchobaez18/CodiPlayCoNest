@@ -12,6 +12,7 @@ import { UsersModule } from '../users/users.module';
   imports: [
     TypeOrmModule.forFeature([Estudiante, Mensaje]),
     UsersModule,
-  ]
+  ],
+  exports: [EstudiantesService],
 })
 export class EstudiantesModule {}
