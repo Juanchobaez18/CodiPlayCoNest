@@ -28,9 +28,11 @@ nombre: string;
   @IsNumber()
   docenteId: number;
 
-  // Relación con estudiantes (muchos)
+  // Relación con estudiantes (muchos), opcional al crear el curso
+  @IsOptional()
   @IsArray()
-  estudiantesIds: number[];
+  @IsNumber({}, { each: true })
+  estudiantesIds?: number[];
 }
 
 export class UpdateCursoDto extends PartialType(CreateCursoDto) {}

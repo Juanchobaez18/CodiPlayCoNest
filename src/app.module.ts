@@ -19,6 +19,7 @@ import { MensajesModule } from './mensajes/mensajes.module';
 import config from './config';
 import { PaymentsModule } from './payments/payments.module';
 import { ForosModule } from './foros/foros.module';
+import { AdminModule } from './admin/admin.module';
 
 @Module({
   imports: [
@@ -49,6 +50,7 @@ import { ForosModule } from './foros/foros.module';
     ModulosModule,
     ForosModule,
     MensajesModule,
+    AdminModule,
   ],
   controllers: [AppController],
   providers: [AppService],

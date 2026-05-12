@@ -7,9 +7,10 @@ import { CreateUserDto, UpdateUserDto } from 'src/users/dtos/user.dto';
 import { UsersService } from '../../../users/services/users/users.service';
 import { JwtAuthGuard } from '../../../auth/guards/auth.guard';
 
+
 @ApiBearerAuth()
-@Modules('users')
-@UseGuards(JwtAuthGuard, ModulesGuard)
+//@Modules('users')
+//@UseGuards(JwtAuthGuard, ModulesGuard)
 @Controller('users')
 export class UsersController {
 
