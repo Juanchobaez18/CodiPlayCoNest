@@ -5,6 +5,7 @@ import { ExtractJwt, Strategy } from 'passport-jwt';
 import { UsersService } from '../../users/services/users/users.service'; // ajusta según tu estructura
 import { JwtPayload } from '../interfaces/jwt-payload.interface';
 import config from '../../config';
+import { sanitizeUserForJsonResponse } from '../utils/sanitize-user-for-json';
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
@@ -27,9 +28,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     if (!user) {
       throw new UnauthorizedException('User not found');
     }
-    // ❌ Excluimos la contraseña
     const { password, ...result } = user;
-    // Esto se asigna a req.user y puede usarse en guards
-    return result;
+    return sanitizeUserForJsonResponse(result as Record<string, unknown>);
   }
 }

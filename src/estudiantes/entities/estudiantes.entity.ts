@@ -24,6 +24,9 @@ export class Estudiante {
   @OneToOne(() => User, (user) => user.estudiante)
   @JoinColumn()
   user: User;
+  
+  @Column({ default: 0, nullable: true })
+progreso: number;
 
   @ManyToMany(() => Curso, (curso) => curso.estudiantes)
   cursos: Curso[];

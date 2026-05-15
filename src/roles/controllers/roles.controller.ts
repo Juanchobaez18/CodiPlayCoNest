@@ -22,8 +22,8 @@ import { Modules } from '../../auth/decorators/modules.decorator';
 import { ModulesGuard } from '../../auth/guards/modules.guard.guard';
 
 @ApiBearerAuth()
-//@Modules('roles')
-//@UseGuards(JwtAuthGuard, ModulesGuard)
+@Modules('roles')
+@UseGuards(JwtAuthGuard, ModulesGuard)
 @ApiTags('Roles')
 @Controller('roles')
 export class RolesController {

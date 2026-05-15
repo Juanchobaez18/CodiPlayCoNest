@@ -36,6 +36,8 @@ export class UsersService {
                 roles: {
                     modules: true,
                 },
+                docente: true,
+                estudiante: true,
             },
             // relations: ['roles'], //clave
         });
@@ -53,6 +55,8 @@ export class UsersService {
                 roles: {
                     modules: true,
                 },
+                docente: true,
+                estudiante: true,
             },
         });
         if (!user) {

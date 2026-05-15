@@ -16,5 +16,5 @@ export class Lecciones {
         orden: string;
 
 @ManyToOne(() => Modulos, modulos => modulos.lecciones)
-modulo: Modulos[];
+modulo: Modulos;
 }
