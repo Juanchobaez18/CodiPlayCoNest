@@ -4,6 +4,7 @@ import { User } from 'src/users/entities/user.entity';
 import { UsersService } from 'src/users/services/users/users.service';
 import * as bcrypt from 'bcrypt';
 import { UserModel } from '../../users/interfaces/user';
+import { sanitizeUserForJsonResponse } from '../utils/sanitize-user-for-json';
 
 @Injectable()
 export class AuthService {
@@ -22,7 +23,9 @@ export class AuthService {
         }
 
         const { password: _, ...result } = user;
-        return result;
+        return sanitizeUserForJsonResponse(
+            result as Record<string, unknown>,
+        ) as unknown as User;
     }
 
     async login(user: UserModel) {
@@ -34,7 +37,7 @@ export class AuthService {
 
         return {
             access_token: this.jwtService.sign(payload),
-            user,
+            user: sanitizeUserForJsonResponse(user as unknown as Record<string, unknown>),
         };
     }
 
@@ -47,7 +50,7 @@ export class AuthService {
         const payload = {sub: dbUser.id, email: dbUser.email}
 
         return {
-            user: dbUser,
+            user: sanitizeUserForJsonResponse(dbUser as unknown as Record<string, unknown>),
             access_token: this.jwtService.sign(payload),
         }
     }
