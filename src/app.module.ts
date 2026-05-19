@@ -19,6 +19,7 @@ import { MensajesModule } from './mensajes/mensajes.module';
 import config from './config';
 import { PaymentsModule } from './payments/payments.module';
 import { ForosModule } from './foros/foros.module';
+import { ContactModule } from './contact/contact.module';
 
 @Module({
   imports: [
@@ -34,6 +35,12 @@ import { ForosModule } from './foros/foros.module';
         POSTGRES_HOST: Joi.string().required(),
         JWT_SECRET: Joi.string().required(),
         JWT_EXPIRES_IN: Joi.number().required(),
+        MAIL_HOST: Joi.string().required(),
+        MAIL_PORT: Joi.number().required(),
+        MAIL_USER: Joi.string().required(),
+        MAIL_PASS: Joi.string().required(),
+        MAIL_FROM: Joi.string().required(),
+        MAIL_TO: Joi.string().required(),
       }),
     }),
     DatabaseModule,
@@ -49,6 +56,7 @@ import { ForosModule } from './foros/foros.module';
     ModulosModule,
     ForosModule,
     MensajesModule,
+    ContactModule,
   ],
   controllers: [AppController],
   providers: [AppService],
