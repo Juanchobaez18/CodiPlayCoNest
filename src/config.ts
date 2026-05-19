@@ -18,5 +18,13 @@ export default registerAs('config', () => {
             expiresIn: parseInt(process.env.JWT_EXPIRES_IN ?? '3600', 10)
             // expiresIn: process.env.JWT_EXPIRES_IN,
         },
+        mail: {
+            host: process.env.MAIL_HOST,
+            port: parseInt(process.env.MAIL_PORT || '587', 10),
+            user: process.env.MAIL_USER,
+            pass: process.env.MAIL_PASS,
+            from: process.env.MAIL_FROM,
+            to: process.env.MAIL_TO,
+        },
     }
 });
