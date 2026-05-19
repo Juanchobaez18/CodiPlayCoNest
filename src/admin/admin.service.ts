@@ -46,15 +46,14 @@ export class AdminService {
     };
   }
 
+  /**
+   * Usuarios que puede ver el panel para gestionar.
+   * Incluye administrador, docente y estudiante aunque el nombre del rol en BD varíe
+   * (antes se filtraba por texto fijo y podía ocultar al administrador).
+   */
   async listManagedUsers() {
     const users = await this.usersService.findAll();
-    return users.filter((u) => {
-      if (!u.roles?.length) return false;
-      return u.roles.some((r) => {
-        const n = String(r.name).toUpperCase();
-        return n === 'DOCENTE' || n === 'ESTUDIANTE';
-      });
-    });
+    return users.filter((u) => (u.roles?.length ?? 0) > 0);
   }
 
   private async resolveDocenteRoleId(): Promise<number> {
