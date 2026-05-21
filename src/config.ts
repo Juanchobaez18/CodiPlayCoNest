@@ -26,5 +26,11 @@ export default registerAs('config', () => {
             from: process.env.MAIL_FROM,
             to: process.env.MAIL_TO,
         },
+        stripe: {
+            publishableKey: process.env.STRIPE_PUBLISHABLE_KEY,
+            secretKey: process.env.STRIPE_SECRET_KEY,
+            webhookSecret: process.env.STRIPE_WEBHOOK_SECRET,
+            currency: process.env.STRIPE_CURRENCY || 'usd',
+        },
     }
 });
