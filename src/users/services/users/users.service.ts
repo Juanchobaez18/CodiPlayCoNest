@@ -127,6 +127,13 @@ export class UsersService {
     //     this.userRepo.merge(user, payloadUpdated);
     // }
 
+    async updateAvatar(id: number, avatarPath: string) {
+        const user = await this.userRepo.findOne({ where: { id } });
+        if (!user) throw new NotFoundException(`User #${id} not found`);
+        user.avatar = avatarPath;
+        return this.userRepo.save(user);
+    }
+
     deleteUser(idUser: number) {
         return this.userRepo.delete(idUser);
     }
