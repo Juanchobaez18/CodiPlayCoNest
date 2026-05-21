@@ -2,130 +2,164 @@ import {
   Controller,
   Get,
   Post,
-  Put,
   Body,
   UseGuards,
   Request,
   Param,
   ParseIntPipe,
   ForbiddenException,
+  Query,
+  UploadedFile,
+  UseInterceptors,
+  BadRequestException,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { memoryStorage } from 'multer';
+import { ApiBearerAuth, ApiTags, ApiConsumes } from '@nestjs/swagger';
 import { JwtAuthGuard } from 'src/auth/guards/auth.guard';
+import { AccesoFuncionalDocenteGuard } from '../../guards/acceso-funcional-docente.guard';
 import { DocentePanelService } from '../../service/docente-panel/docente-panel.service';
-import { SendMensajeDto, CreateTareaDto } from '../../dtos/docente-dashboard.dto';
+import {
+  SendMensajePanelDto,
+  CalificarTareaDto,
+} from '../../dtos/docente-panel-api.dto';
+import { RequiereAccesoDocente } from '../../decorators/acceso-funcional.decorator';
 
 @ApiTags('Docente Panel')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, AccesoFuncionalDocenteGuard)
+@RequiereAccesoDocente()
 @Controller('docente')
 export class DocentePanelController {
   constructor(private readonly docentePanelService: DocentePanelService) {}
 
-  private resolveDocenteId(req: { user?: { docente?: { id?: number } } }): number {
-    const id = req.user?.docente?.id;
+  private resolveDocenteId(req: {
+    docenteId?: number;
+    user?: { docente?: { id?: number } };
+  }): number {
+    const id = req.docenteId ?? req.user?.docente?.id;
     if (id == null || Number(id) < 1) {
       throw new ForbiddenException(
-        'Esta área requiere un perfil de docente asociado a la cuenta.',
+        'Esta operación requiere un perfil de docente vinculado a su cuenta.',
       );
     }
     return Number(id);
   }
 
-  /**
-   * Obtener estadísticas del dashboard del docente autenticado
-   */
   @Get('dashboard/stats')
-  async getDashboardStats(@Request() req: any) {
-    const docenteId = this.resolveDocenteId(req);
-    return this.docentePanelService.getDashboardStats(docenteId);
+  getDashboardStats(@Request() req: { docenteId?: number; user?: { docente?: { id?: number } } }) {
+    return this.docentePanelService.getDashboardStats(this.resolveDocenteId(req));
   }
 
-  /**
-   * Obtener cursos del docente autenticado
-   */
   @Get('cursos')
-  async getCursos(@Request() req: any) {
-    const docenteId = this.resolveDocenteId(req);
-    return this.docentePanelService.getCursos(docenteId);
+  getCursos(
+    @Request() req: { docenteId?: number; user?: { docente?: { id?: number } } },
+    @Query('estado') estado?: string,
+  ) {
+    const estadoFilter =
+      estado === undefined ? undefined : estado === 'true' || estado === '1';
+    return this.docentePanelService.getCursos(
+      this.resolveDocenteId(req),
+      estadoFilter,
+    );
   }
 
-  /**
-   * Obtener detalles de un curso específico
-   */
   @Get('cursos/:id')
-  async getCursoDetalle(
-    @Request() req: any,
+  getCursoDetalle(
+    @Request() req: { docenteId?: number; user?: { docente?: { id?: number } } },
     @Param('id', ParseIntPipe) cursoId: number,
   ) {
-    const docenteId = this.resolveDocenteId(req);
-    return this.docentePanelService.getCursoDetalle(docenteId, cursoId);
+    return this.docentePanelService.getCursoDetalle(
+      this.resolveDocenteId(req),
+      cursoId,
+    );
   }
 
-  /**
-   * Obtener estudiantes del docente autenticado
-   */
   @Get('estudiantes')
-  async getEstudiantes(@Request() req: any) {
-    const docenteId = this.resolveDocenteId(req);
-    return this.docentePanelService.getEstudiantes(docenteId);
-  }
-
-  /**
-   * Obtener tareas del docente autenticado
-   */
-  @Get('tareas')
-  async getTareas(@Request() req: any) {
-    const docenteId = this.resolveDocenteId(req);
-    return this.docentePanelService.getTareas(docenteId);
-  }
-
-  /**
-   * Obtener mensajes del docente autenticado
-   */
-  @Get('mensajes')
-  async getMensajes(@Request() req: any) {
-    const docenteId = this.resolveDocenteId(req);
-    return this.docentePanelService.getMensajes(docenteId);
-  }
-
-  /**
-   * Obtener foros del docente autenticado
-   */
-  @Get('foros')
-  async getForos(@Request() req: any) {
-    const docenteId = this.resolveDocenteId(req);
-    return this.docentePanelService.getForos(docenteId);
-  }
-
-  /**
-   * Crear una nueva tarea
-   */
-  @Post('tareas')
-  async createTarea(@Request() req: any, @Body() dto: CreateTareaDto) {
-    const docenteId = this.resolveDocenteId(req);
-    return this.docentePanelService.createTarea(docenteId, dto);
-  }
-
-  /**
-   * Enviar un mensaje
-   */
-  @Post('mensajes')
-  async sendMensaje(@Request() req: any, @Body() dto: SendMensajeDto) {
-    const docenteId = this.resolveDocenteId(req);
-    return this.docentePanelService.sendMensaje(docenteId, dto);
-  }
-
-  /**
-   * Actualizar un curso
-   */
-  @Put('cursos/:id')
-  async updateCurso(
-    @Request() req: any,
-    @Param('id', ParseIntPipe) cursoId: number,
-    @Body() dto: any,
+  getEstudiantes(
+    @Request() req: { docenteId?: number; user?: { docente?: { id?: number } } },
+    @Query('cursoId') cursoId?: string,
   ) {
-    const docenteId = this.resolveDocenteId(req);
-    return this.docentePanelService.updateCurso(docenteId, cursoId, dto);
+    return this.docentePanelService.getEstudiantes(
+      this.resolveDocenteId(req),
+      cursoId ? Number(cursoId) : undefined,
+    );
+  }
+
+  @Get('tareas')
+  getTareas(
+    @Request() req: { docenteId?: number; user?: { docente?: { id?: number } } },
+    @Query('cursoId') cursoId?: string,
+  ) {
+    return this.docentePanelService.getTareas(
+      this.resolveDocenteId(req),
+      cursoId ? Number(cursoId) : undefined,
+    );
+  }
+
+  @Post('tareas/calificar')
+  calificarTarea(
+    @Request() req: { docenteId?: number; user?: { docente?: { id?: number } } },
+    @Body() dto: CalificarTareaDto,
+  ) {
+    return this.docentePanelService.calificarTarea(
+      this.resolveDocenteId(req),
+      dto,
+    );
+  }
+
+  @Get('mensajes')
+  getMensajes(
+    @Request() req: { docenteId?: number; user?: { docente?: { id?: number } } },
+    @Query('tipo') tipo?: 'enviado' | 'recibido' | 'todos',
+  ) {
+    return this.docentePanelService.getMensajes(
+      this.resolveDocenteId(req),
+      tipo ?? 'todos',
+    );
+  }
+
+  @Post('mensajes')
+  sendMensaje(
+    @Request() req: { docenteId?: number; user?: { docente?: { id?: number } } },
+    @Body() dto: SendMensajePanelDto,
+  ) {
+    return this.docentePanelService.sendMensaje(
+      this.resolveDocenteId(req),
+      dto,
+    );
+  }
+
+  @Get('foros')
+  getForos(
+    @Request() req: { docenteId?: number; user?: { docente?: { id?: number } } },
+    @Query('cursoId') cursoId?: string,
+  ) {
+    return this.docentePanelService.getForos(
+      this.resolveDocenteId(req),
+      cursoId ? Number(cursoId) : undefined,
+    );
+  }
+
+  @Post('subir-foto')
+  @ApiConsumes('multipart/form-data')
+  @UseInterceptors(
+    FileInterceptor('foto', {
+      storage: memoryStorage(),
+      limits: { fileSize: 5 * 1024 * 1024 },
+    }),
+  )
+  uploadFoto(
+    @Request() req: { userId?: number; user?: { id?: number } },
+    @UploadedFile() file?: { buffer: Buffer; mimetype: string; size: number; originalname: string },
+  ) {
+    const userId = req.userId ?? req.user?.id;
+    if (!userId) {
+      throw new BadRequestException('Usuario no identificado');
+    }
+    if (!file) {
+      throw new BadRequestException('Debe enviar el archivo en el campo "foto"');
+    }
+    return this.docentePanelService.uploadFotoPerfil(userId, file);
   }
 }
