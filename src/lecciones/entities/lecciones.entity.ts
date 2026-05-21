@@ -1,4 +1,4 @@
-import { Column, Entity, PrimaryGeneratedColumn } from "typeorm";
+import { Column, Entity, PrimaryGeneratedColumn, CreateDateColumn, UpdateDateColumn } from "typeorm";
 
 @Entity()
 export class Lecciones {
@@ -13,5 +13,18 @@ export class Lecciones {
         contenido: string;
         @Column()
         orden: string;
+
+        @Column({
+            type: 'enum',
+            enum: ['borrador', 'publicado'],
+            default: 'borrador'
+        })
+        estado: string;
+
+        @CreateDateColumn({ name: 'creado_en' })
+        creadoEn: Date;
+
+        @UpdateDateColumn({ name: 'actualizado_en' })
+        actualizadoEn: Date;
 
 }
