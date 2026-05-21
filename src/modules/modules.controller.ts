@@ -8,8 +8,8 @@ import { ModulesGuard } from 'src/auth/guards/modules.guard.guard';
 
 @ApiTags('Modules')
 @ApiBearerAuth()
-@Modules('modules')
-@UseGuards(JwtAuthGuard, ModulesGuard)
+//@Modules('modules')
+//@UseGuards(JwtAuthGuard, ModulesGuard)
 @Controller('modules')
 export class ModulesController {
 

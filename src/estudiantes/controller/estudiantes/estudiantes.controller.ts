@@ -32,6 +32,11 @@ export class EstudiantesController {
     findAll() {
         return this.estudiantesService.findAll();
     }
+    @Get('by-user/:userId')
+@ApiOperation({ summary: 'Obtener estudiante por ID de usuario' })
+findByUserId(@Param('userId', ParseIntPipe) userId: number) {
+    return this.estudiantesService.findByUserId(userId);
+}
 
     @Get(':id')
     @ApiOperation({ summary: 'Obtener un estudiante por ID' })
