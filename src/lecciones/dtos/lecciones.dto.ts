@@ -1,41 +1,23 @@
 import { ApiProperty, PartialType } from "@nestjs/swagger";
-import { IsEnum, IsNumber, IsString, IsOptional, IsNotEmpty, MinLength } from "class-validator";
+import { isString } from "class-validator";
 import { string } from "joi";
 
 export class CreateLeccionesDto {
-  @IsString()
-  @IsNotEmpty()
-  @MinLength(3)
-  @ApiProperty()
-  titulo: string;
+@isString()
+@ApiProperty()
+titulo: string;
 
-  @IsString()
-  @IsNotEmpty()
-  @MinLength(10)
-  @ApiProperty()
-  descripcion: string;
+@isString()
+@ApiProperty()
+descripcion: string;
 
-  @IsString()
-  @IsNotEmpty()
-  @MinLength(20)
-  @ApiProperty()
-  contenido: string;
+@isString()
+@ApiProperty()
+contenido: string;
 
-  @IsString()
-  @IsNotEmpty()
-  @ApiProperty()
-  orden: string;
-
-  @IsEnum(['borrador', 'publicado'])
-  @IsNotEmpty()
-  @ApiProperty({ enum: ['borrador', 'publicado'], default: 'borrador' })
-  estado: string;
-
-  // 🔥 clave para relacionar con modulo
-  @IsNumber()
-  @IsNotEmpty()
-  @ApiProperty()
-  moduloId: number;
+@isString()
+@ApiProperty()
+orden: string;
 }
 
 export class UpdateLeccionesDto extends PartialType(CreateLeccionesDto) { }
