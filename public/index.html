@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>CodiPlay - Clase Gratis</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <header class="hero">
+      <div class="hero-content">
+        <h1>Aprende con CodiPlay</h1>
+        <p>Solicita información y recibe una clase gratis. Te contactaremos pronto para agendar tu sesión.</p>
+        <a class="button" href="#contact-section">Pedir información</a>
+      </div>
+    </header>
+
+    <main>
+      <section id="contact-section" class="contact-section">
+        <div class="card">
+          <h2>Pedir información</h2>
+          <p>Completa el formulario y te enviaremos un correo confirmando que nos pondremos en contacto.</p>
+
+          <form id="contact-form">
+            <label>
+              Nombre completo
+              <input type="text" name="name" placeholder="Tu nombre" required minlength="2" />
+            </label>
+            <label>
+              Correo electrónico
+              <input type="email" name="email" placeholder="tu@correo.com" required />
+            </label>
+            <label>
+              Teléfono (opcional)
+              <input type="text" name="phone" placeholder="+57 300 0000000" />
+            </label>
+            <label>
+              Mensaje (opcional)
+              <textarea name="message" placeholder="Cuéntanos qué te interesa"></textarea>
+            </label>
+            <button type="submit">Enviar solicitud</button>
+          </form>
+
+          <div id="form-message" class="form-message"></div>
+        </div>
+      </section>
+    </main>
+
+    <script src="/contact.js"></script>
+  </body>
+</html>

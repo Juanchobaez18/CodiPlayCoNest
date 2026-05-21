@@ -88,4 +88,17 @@ export class EstudiantesService {
         }
         return await this.estudianteRepo.remove(estudiante);
     }
+    async findByUserId(userId: number) {
+    const estudiante = await this.estudianteRepo.findOne({
+        where: { user: { id: userId } },
+        relations: {
+            user: true,
+            cursos: true,
+            foros: true,
+            mensajes: true,
+        },
+    });
+    if (!estudiante) throw new NotFoundException(`Estudiante del usuario #${userId} no encontrado`);
+    return estudiante;
+}
 }

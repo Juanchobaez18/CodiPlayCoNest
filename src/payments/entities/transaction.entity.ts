@@ -21,39 +21,42 @@ export enum TransactionStatus {
 @Index(['status'])
 export class Transaction {
   @PrimaryGeneratedColumn('increment')
-  id: number;
+  id!: number;
 
   @Column({ type: 'int' })
-  estudianteId: number;
+  estudianteId!: number;
 
-  @ManyToOne(() => Estudiante, { eager: false })
-  estudiante: Estudiante;
+@ManyToOne(() => Estudiante, (estudiante) => estudiante.transactions)
+estudiante: Estudiante;
 
   @Column({ type: 'int' })
-  cursoId: number;
+  cursoId!: number;
 
-  @ManyToOne(() => Curso, { eager: false })
-  curso: Curso;
+  @ManyToOne(() => Curso, (curso) => curso.transactions, { eager: false })
+curso!: Curso;
 
   @Column({ type: 'decimal', precision: 10, scale: 2 })
-  amount: number;
+  amount!: number;
 
   @Column({ type: 'varchar', length: 3, default: 'USD' })
-  currency: string;
+  currency!: string;
+
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  stripePaymentIntentId?: string;
 
   @Column({
     type: 'enum',
     enum: TransactionStatus,
     default: TransactionStatus.PENDING,
   })
-  status: TransactionStatus;
+  status!: TransactionStatus;
 
   @Column({ type: 'jsonb', nullable: true })
-  metadata: Record<string, any>;
+  metadata!: Record<string, any>;
 
   @CreateDateColumn()
-  createdAt: Date;
+  createdAt!: Date;
 
   @UpdateDateColumn()
-  updatedAt: Date;
+  updatedAt!: Date;
 }

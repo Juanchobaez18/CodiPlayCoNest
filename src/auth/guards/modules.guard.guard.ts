@@ -17,13 +17,17 @@ export class ModulesGuard implements CanActivate {
       throw new ForbiddenException('No roles assigned');
     }
 
-    // Verificamos que al menos un rol tenga uno de los módulos requeridos
-    const hasModule = user.roles.some(role =>
-      role.modules?.some(m => requiredModules.includes(m.name))
-    );
+    // Verificamos que al menos un rol tenga acceso (ya sea por ser admin o por tener el módulo asignado)
+    const hasAccess = user.roles.some(role => {
+      // Si el rol es 'admin', tiene acceso total
+      if (role.name === 'admin') return true;
 
-    if (!hasModule) {
-      throw new ForbiddenException(`Missing required module: ${requiredModules}`);
+      // Si no es admin, verificamos si tiene el módulo habilitado
+      return role.modules?.some(m => requiredModules.includes(m.name));
+    });
+
+    if (!hasAccess) {
+      throw new ForbiddenException(`Access denied. Missing required modules: ${requiredModules.join(', ')}`);
     }
 
     return true;

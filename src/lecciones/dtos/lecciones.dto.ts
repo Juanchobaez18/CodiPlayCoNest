@@ -37,5 +37,4 @@ export class CreateLeccionesDto {
   @ApiProperty()
   moduloId: number;
 }
-
-export class UpdateLeccionesDto extends PartialType(CreateLeccionesDto) { }
+export class UpdateLeccionesDto extends PartialType(CreateLeccionesDto) {}
