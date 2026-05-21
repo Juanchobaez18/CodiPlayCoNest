@@ -12,6 +12,7 @@ import {
 import { Estudiante } from '../../estudiantes/entities/estudiantes.entity';
 import { Docente } from '../../docente/entities/docente.entity';
 import { Modulos } from '../../modulos/entities/modulos.entity';
+import { Curso } from '../../curso/entity/curso.entity/curso.entity';
 import { OneToMany } from 'typeorm';
 import { ForoRespuesta } from './foro_respuesta.entity';
 
@@ -45,6 +46,10 @@ export class Forum {
     @JoinColumn({ name: 'modulo_id' })
     modulo: Modulos | null;
 
+    @ManyToOne(() => Curso, { nullable: true })
+    @JoinColumn({ name: 'curso_id' })
+    curso: Curso | null;
+
     @OneToMany(() => ForoRespuesta, (respuesta) => respuesta.foro)
-respuestas: ForoRespuesta[];
+    respuestas: ForoRespuesta[];
 }

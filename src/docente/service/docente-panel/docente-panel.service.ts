@@ -1,330 +1,721 @@
-import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ForbiddenException,
+  BadRequestException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { Docente } from 'src/docente/entities/docente.entity';
+import { Repository, In } from 'typeorm';
+import { join } from 'path';
+import { existsSync, mkdirSync } from 'fs';
+import { writeFile } from 'fs/promises';
+import { Docente } from '../../entities/docente.entity';
 import { Curso } from 'src/curso/entity/curso.entity/curso.entity';
 import { Estudiante } from 'src/estudiantes/entities/estudiantes.entity';
 import { Mensaje } from 'src/mensajes/entities/mensaje.entity';
+import { Forum } from 'src/foros/entities/forum.entity';
+import { ForoRespuesta } from 'src/foros/entities/foro_respuesta.entity';
+import { Tarea, EstadoTareaEntidad } from '../../entities/tarea.entity';
 import {
-  DocenteDashboardStatsDto,
-  DocenteCursoDto,
-  DocenteEstudianteDto,
-  DocenteTareaDto,
-  DocenteMensajeDto,
-  CreateTareaDto,
-  SendMensajeDto,
-} from '../../dtos/docente-dashboard.dto';
-import { RemitenteTipo } from 'src/mensajes/dto/crear-mensaje.dto';
+  TareaEntrega,
+  EstadoEntregaTarea,
+} from '../../entities/tarea-entrega.entity';
+import { User } from 'src/users/entities/user.entity';
+import {
+  RemitenteTipo,
+  MensajeEstado,
+} from 'src/mensajes/dto/crear-mensaje.dto';
+import {
+  SendMensajePanelDto,
+  CalificarTareaDto,
+  CreateForoPanelDto,
+  UpdateForoPanelDto,
+} from '../../dtos/docente-panel-api.dto';
+import { Modulos } from 'src/modulos/entities/modulos.entity';
+
+type EstadoProgresoEstudiante = 'completado' | 'en_progreso' | 'iniciando';
 
 @Injectable()
 export class DocentePanelService {
   constructor(
     @InjectRepository(Docente)
-    private docenteRepository: Repository<Docente>,
-
+    private readonly docenteRepository: Repository<Docente>,
     @InjectRepository(Curso)
-    private cursoRepository: Repository<Curso>,
-
+    private readonly cursoRepository: Repository<Curso>,
     @InjectRepository(Estudiante)
-    private estudianteRepository: Repository<Estudiante>,
-
+    private readonly estudianteRepository: Repository<Estudiante>,
     @InjectRepository(Mensaje)
-    private mensajeRepository: Repository<Mensaje>,
+    private readonly mensajeRepository: Repository<Mensaje>,
+    @InjectRepository(Forum)
+    private readonly forumRepository: Repository<Forum>,
+    @InjectRepository(ForoRespuesta)
+    private readonly foroRespuestaRepository: Repository<ForoRespuesta>,
+    @InjectRepository(Tarea)
+    private readonly tareaRepository: Repository<Tarea>,
+    @InjectRepository(TareaEntrega)
+    private readonly entregaRepository: Repository<TareaEntrega>,
+    @InjectRepository(User)
+    private readonly userRepository: Repository<User>,
+    @InjectRepository(Modulos)
+    private readonly moduloRepository: Repository<Modulos>,
   ) {}
 
-  /**
-   * Obtener estadísticas del dashboard del docente
-   */
-  async getDashboardStats(docenteId: number): Promise<DocenteDashboardStatsDto> {
-    // Validar que el docente existe
+  private async assertDocente(docenteId: number): Promise<Docente> {
     const docente = await this.docenteRepository.findOne({
       where: { id: docenteId },
-      relations: ['cursos', 'cursos.estudiantes'],
+      relations: ['user'],
     });
-
     if (!docente) {
       throw new NotFoundException('Docente no encontrado');
     }
+    return docente;
+  }
 
-    // Calcular estadísticas
-    const totalCursosActivos = docente.cursos?.filter(c => c.estado).length || 0;
-    const totalEstudiantes = docente.cursos?.reduce((acc, curso) => {
-      return acc + (curso.estudiantes?.length || 0);
-    }, 0) || 0;
+  private async assertCursoDelDocente(
+    docenteId: number,
+    cursoId: number,
+  ): Promise<Curso> {
+    const curso = await this.cursoRepository.findOne({
+      where: { id: cursoId, docente: { id: docenteId } },
+      relations: ['docente', 'estudiantes', 'estudiantes.user', 'modulos', 'modulos.lecciones'],
+    });
+    if (!curso) {
+      throw new NotFoundException('Curso no encontrado o sin acceso');
+    }
+    return curso;
+  }
 
-    // Calcular tasa de completación (simulado - ajustar según lógica real)
-    const tasaCompletacion = totalEstudiantes > 0 ? 75 : 0;
+  private nombreCompleto(user?: User | null): string {
+    if (!user) return 'Usuario';
+    return `${user.name ?? ''} ${user.lastName ?? ''}`.trim() || 'Usuario';
+  }
+
+  private estadoProgreso(progreso: number): EstadoProgresoEstudiante {
+    if (progreso >= 100) return 'completado';
+    if (progreso > 0) return 'en_progreso';
+    return 'iniciando';
+  }
+
+  private calcularPosicionModulo(
+    progreso: number,
+    modulos: Modulos[],
+  ): {
+    moduloActual?: string;
+    leccionActual?: string;
+    progresoModulo?: number;
+  } {
+    const ordenados = [...modulos].sort((a, b) => a.orden - b.orden);
+    const leccionesTotales = ordenados.reduce(
+      (acc, m) => acc + (m.lecciones?.length ?? 0),
+      0,
+    );
+    if (!leccionesTotales) {
+      return {};
+    }
+
+    const leccionesCompletadas = Math.floor(
+      (Math.min(100, Math.max(0, progreso)) / 100) * leccionesTotales,
+    );
+    let contador = 0;
+
+    for (const modulo of ordenados) {
+      const lecciones = [...(modulo.lecciones ?? [])].sort(
+        (a, b) => Number(a.orden) - Number(b.orden),
+      );
+      for (const leccion of lecciones) {
+        if (contador >= leccionesCompletadas) {
+          const progresoModulo =
+            lecciones.length > 0
+              ? Math.round(
+                  ((leccionesCompletadas - (contador - lecciones.indexOf(leccion))) /
+                    lecciones.length) *
+                    100,
+                )
+              : 0;
+          return {
+            moduloActual: modulo.titulo,
+            leccionActual: leccion.titulo,
+            progresoModulo: Math.min(100, Math.max(0, progresoModulo || progreso)),
+          };
+        }
+        contador++;
+      }
+    }
+
+    const ultimo = ordenados[ordenados.length - 1];
+    const ultimaLeccion = ultimo?.lecciones?.[ultimo.lecciones.length - 1];
+    return {
+      moduloActual: ultimo?.titulo,
+      leccionActual: ultimaLeccion?.titulo,
+      progresoModulo: 100,
+    };
+  }
+
+  async getDashboardStats(docenteId: number) {
+    await this.assertDocente(docenteId);
+    const cursos = await this.cursoRepository.find({
+      where: { docente: { id: docenteId }, estado: true },
+      relations: ['estudiantes'],
+    });
+
+    const estudianteIds = new Set<number>();
+    let sumaProgreso = 0;
+    let contadorProgreso = 0;
+
+    for (const curso of cursos) {
+      for (const est of curso.estudiantes ?? []) {
+        estudianteIds.add(est.id);
+        sumaProgreso += est.progreso ?? 0;
+        contadorProgreso++;
+      }
+    }
+
+    const tasaCompletacion =
+      contadorProgreso > 0
+        ? Math.round((sumaProgreso / contadorProgreso) * 10) / 10
+        : 0;
 
     return {
-      totalEstudiantes,
-      totalCursosActivos,
+      totalEstudiantes: estudianteIds.size,
+      totalCursosActivos: cursos.length,
       tasaCompletacion,
     };
   }
 
-  /**
-   * Obtener cursos del docente
-   */
-  async getCursos(docenteId: number): Promise<DocenteCursoDto[]> {
-    const docente = await this.docenteRepository.findOne({
-      where: { id: docenteId },
-      relations: ['cursos', 'cursos.estudiantes'],
-    });
-
-    if (!docente) {
-      throw new NotFoundException('Docente no encontrado');
+  async getCursos(docenteId: number, estadoFilter?: boolean) {
+    await this.assertDocente(docenteId);
+    const where: Record<string, unknown> = { docente: { id: docenteId } };
+    if (estadoFilter !== undefined) {
+      where.estado = estadoFilter;
     }
 
-    return docente.cursos.map(curso => ({
+    const cursos = await this.cursoRepository.find({
+      where,
+      relations: ['estudiantes'],
+      order: { id: 'ASC' },
+    });
+
+    return cursos.map((curso) => ({
       id: curso.id,
       nombre: curso.nombre,
       descripcion: curso.descripcion,
-      estudiantes: curso.estudiantes?.length || 0,
-      progreso: 65, // Simulado - calcular según progreso real
+      estudiantes: curso.estudiantes?.length ?? 0,
+      progreso: this.calcularProgresoPromedio(curso.estudiantes ?? []),
       estado: curso.estado,
     }));
   }
 
-  /**
-   * Obtener estudiantes del docente
-   */
-  async getEstudiantes(docenteId: number): Promise<DocenteEstudianteDto[]> {
-    const docente = await this.docenteRepository.findOne({
-      where: { id: docenteId },
-      relations: ['cursos', 'cursos.estudiantes', 'cursos.estudiantes.user'],
+  async getCursoDetalle(docenteId: number, cursoId: number) {
+    const curso = await this.assertCursoDelDocente(docenteId, cursoId);
+    const modulosOrdenados = [...(curso.modulos ?? [])].sort(
+      (a, b) => a.orden - b.orden,
+    );
+
+    const estudiantes = (curso.estudiantes ?? []).map((est) => {
+      const progreso = est.progreso ?? 0;
+      const posicion = this.calcularPosicionModulo(progreso, modulosOrdenados);
+      const estado = this.estadoProgreso(progreso);
+      return {
+        id: est.id,
+        nombre: est.user?.name ?? 'Desconocido',
+        apellido: est.user?.lastName ?? '',
+        email: est.user?.email ?? '',
+        progreso,
+        estado,
+        moduloActual: estado === 'completado' ? null : posicion.moduloActual,
+        leccionActual: estado === 'completado' ? null : posicion.leccionActual,
+        progresoModulo:
+          estado === 'completado' ? 100 : (posicion.progresoModulo ?? progreso),
+      };
     });
 
-    if (!docente) {
-      throw new NotFoundException('Docente no encontrado');
-    }
+    return {
+      id: curso.id,
+      nombre: curso.nombre,
+      descripcion: curso.descripcion,
+      estado: curso.estado,
+      estudiantes,
+      modulos: modulosOrdenados.map((modulo) => ({
+        id: modulo.id,
+        nombre: modulo.titulo,
+        orden: modulo.orden,
+        lecciones: [...(modulo.lecciones ?? [])]
+          .sort((a, b) => Number(a.orden) - Number(b.orden))
+          .map((leccion) => ({
+            id: leccion.id,
+            nombre: leccion.titulo,
+            orden: Number(leccion.orden),
+          })),
+      })),
+    };
+  }
 
-    const estudiantes: Map<number, DocenteEstudianteDto> = new Map();
+  async getEstudiantes(docenteId: number, cursoId?: number) {
+    await this.assertDocente(docenteId);
+    const cursos = await this.cursoRepository.find({
+      where: cursoId
+        ? { docente: { id: docenteId }, id: cursoId }
+        : { docente: { id: docenteId } },
+      relations: ['estudiantes', 'estudiantes.user'],
+    });
 
-    // Recopilar estudiantes únicos de todos los cursos del docente
-    docente.cursos.forEach(curso => {
-      curso.estudiantes?.forEach(est => {
-        if (!estudiantes.has(est.id)) {
-          estudiantes.set(est.id, {
+    const map = new Map<
+      number,
+      {
+        id: number;
+        nombre: string;
+        apellido: string;
+        email: string;
+        cursos: string[];
+        progresoTotal: number;
+        contador: number;
+      }
+    >();
+
+    for (const curso of cursos) {
+      for (const est of curso.estudiantes ?? []) {
+        if (!map.has(est.id)) {
+          map.set(est.id, {
             id: est.id,
-            nombre: est.user?.name || 'Desconocido',
-            apellido: est.user?.lastName || '',
-            email: est.user?.email || '',
+            nombre: est.user?.name ?? 'Desconocido',
+            apellido: est.user?.lastName ?? '',
+            email: est.user?.email ?? '',
             cursos: [],
-            progreso: 50, // Simulado
+            progresoTotal: 0,
+            contador: 0,
           });
         }
-        // Agregar curso a la lista
-        const dto = estudiantes.get(est.id);
-        if (dto?.cursos) {
-          dto.cursos.push(curso.nombre);
-        }
-      });
-    });
-
-    return Array.from(estudiantes.values());
-  }
-
-  /**
-   * Obtener tareas del docente (simulado)
-   */
-  async getTareas(docenteId: number): Promise<DocenteTareaDto[]> {
-    // Validar que el docente existe
-    const docente = await this.docenteRepository.findOne({
-      where: { id: docenteId },
-    });
-
-    if (!docente) {
-      throw new NotFoundException('Docente no encontrado');
+        const row = map.get(est.id)!;
+        row.cursos.push(curso.nombre);
+        row.progresoTotal += est.progreso ?? 0;
+        row.contador++;
+      }
     }
 
-    // Simulado - en una implementación real, tendrías una entidad Tarea
-    return [
-      {
-        id: 1,
-        titulo: 'Tarea 1: Introducción a Angular',
-        descripcion: 'Implementar un componente básico en Angular',
-        fechaVencimiento: '2026-05-20',
-        estudiantes: 15,
-        estado: 'pendiente',
-      },
-      {
-        id: 2,
-        titulo: 'Tarea 2: Servicios HTTP',
-        descripcion: 'Crear un servicio HTTP para consumir APIs',
-        fechaVencimiento: '2026-05-18',
-        estudiantes: 12,
-        estado: 'vencida',
-      },
-      {
-        id: 3,
-        titulo: 'Tarea 3: Forms Reactivos',
-        descripcion: 'Implementar un formulario reactivo con validaciones',
-        fechaVencimiento: '2026-05-25',
-        estudiantes: 18,
-        estado: 'completada',
-      },
-    ];
-  }
-
-  /**
-   * Obtener mensajes del docente
-   */
-  async getMensajes(docenteId: number): Promise<DocenteMensajeDto[]> {
-    const docente = await this.docenteRepository.findOne({
-      where: { id: docenteId },
-      relations: ['mensajes', 'mensajes.estudiante', 'mensajes.estudiante.user'],
-    });
-
-    if (!docente) {
-      throw new NotFoundException('Docente no encontrado');
-    }
-
-    return (docente.mensajes || []).map(msg => ({
-      id: msg.id,
-      remitente: msg.estudiante?.user?.name || 'Sistema',
-      asunto: msg.contenido?.substring(0, 50) || 'Sin asunto',
-      fecha: msg.fecha_envio?.toISOString() || new Date().toISOString(),
-      leido: msg.fecha_lectura ? true : false,
+    return Array.from(map.values()).map((row) => ({
+      id: row.id,
+      nombre: row.nombre,
+      apellido: row.apellido,
+      email: row.email,
+      cursos: row.cursos,
+      progreso:
+        row.contador > 0 ? Math.round(row.progresoTotal / row.contador) : 0,
     }));
   }
 
-  /**
-   * Obtener foros del docente (simplificado)
-   */
-  async getForos(docenteId: number) {
-    const docente = await this.docenteRepository.findOne({
-      where: { id: docenteId },
-      relations: ['foros'],
-    });
-
-    if (!docente) {
-      throw new NotFoundException('Docente no encontrado');
+  async getTareas(docenteId: number, cursoId?: number) {
+    await this.assertDocente(docenteId);
+    const where: Record<string, unknown> = { docente: { id: docenteId } };
+    if (cursoId) {
+      where.curso = { id: cursoId };
     }
 
-    return docente.foros || [];
+    let count = await this.tareaRepository.count({ where });
+    if (count === 0) {
+      await this.generarTareasIniciales(docenteId);
+    }
+
+    const tareas = await this.tareaRepository.find({
+      where,
+      relations: [
+        'curso',
+        'modulo',
+        'leccion',
+        'entregas',
+        'entregas.estudiante',
+        'entregas.estudiante.user',
+      ],
+      order: { fechaVencimiento: 'DESC' },
+    });
+
+    return tareas.map((tarea) => this.mapTareaResponse(tarea));
   }
 
-  /**
-   * Actualizar un curso del docente
-   */
-  async updateCurso(
+  async calificarTarea(docenteId: number, dto: CalificarTareaDto) {
+    await this.assertDocente(docenteId);
+    const entrega = await this.entregaRepository.findOne({
+      where: { id: dto.entregaId },
+      relations: ['tarea', 'tarea.docente', 'estudiante'],
+    });
+
+    if (!entrega) {
+      throw new NotFoundException('Entrega no encontrada');
+    }
+    if (entrega.tarea.docente.id !== docenteId) {
+      throw new ForbiddenException('No puede calificar entregas de otro docente');
+    }
+
+    entrega.estado = EstadoEntregaTarea.CALIFICADO;
+    entrega.calificacion = dto.calificacion;
+    entrega.resultado = dto.resultado;
+    if (!entrega.fechaEntrega) {
+      entrega.fechaEntrega = new Date();
+    }
+
+    await this.entregaRepository.save(entrega);
+
+    const pendientes = await this.entregaRepository.count({
+      where: {
+        tarea: { id: entrega.tarea.id },
+        estado: In([
+          EstadoEntregaTarea.ENTREGADO,
+          EstadoEntregaTarea.NO_ENTREGADO,
+        ]),
+      },
+    });
+    if (pendientes === 0) {
+      entrega.tarea.estado = EstadoTareaEntidad.CALIFICADA;
+      await this.tareaRepository.save(entrega.tarea);
+    }
+
+    return {
+      success: true,
+      message: 'Tarea calificada exitosamente',
+      entrega: {
+        id: entrega.id,
+        estado: entrega.estado,
+        calificacion: entrega.calificacion,
+      },
+    };
+  }
+
+  async getMensajes(
     docenteId: number,
-    cursoId: number,
-    data: any,
+    tipo: 'enviado' | 'recibido' | 'todos' = 'todos',
   ) {
-    const curso = await this.cursoRepository.findOne({
-      where: { id: cursoId },
+    const docente = await this.assertDocente(docenteId);
+    const nombreDocente = this.nombreCompleto(docente.user);
+
+    const mensajes = await this.mensajeRepository.find({
+      where: { docente: { id: docenteId } },
+      relations: ['estudiante', 'estudiante.user'],
+      order: { fecha_envio: 'DESC' },
+    });
+
+    const mapped = mensajes.map((msg) => {
+      const nombreEstudiante = this.nombreCompleto(msg.estudiante?.user);
+      const esEnviado = msg.remitenteTipo === RemitenteTipo.DOCENTE;
+      return {
+        id: msg.id,
+        remitente: esEnviado ? nombreDocente : nombreEstudiante,
+        destinatario: esEnviado ? nombreEstudiante : nombreDocente,
+        asunto: msg.contenido.substring(0, 80) || 'Sin asunto',
+        contenido: msg.contenido,
+        fecha: msg.fecha_envio?.toISOString() ?? new Date().toISOString(),
+        leido: Boolean(msg.fecha_lectura) || msg.estado === MensajeEstado.LEIDO,
+        tipo: esEnviado ? ('enviado' as const) : ('recibido' as const),
+      };
+    });
+
+    if (tipo === 'enviado') {
+      return mapped.filter((m) => m.tipo === 'enviado');
+    }
+    if (tipo === 'recibido') {
+      return mapped.filter((m) => m.tipo === 'recibido');
+    }
+    return mapped;
+  }
+
+  async sendMensaje(docenteId: number, dto: SendMensajePanelDto) {
+    const docente = await this.assertDocente(docenteId);
+    const estudiante = await this.estudianteRepository.findOne({
+      where: { id: dto.destinatarioId },
+      relations: ['user', 'cursos', 'cursos.docente'],
+    });
+
+    if (!estudiante) {
+      throw new NotFoundException('Estudiante no encontrado');
+    }
+
+    const pertenece = (estudiante.cursos ?? []).some(
+      (c) => c.docente?.id === docenteId,
+    );
+    if (!pertenece) {
+      throw new ForbiddenException(
+        'El estudiante no pertenece a ningún curso de este docente',
+      );
+    }
+
+    const mensaje = this.mensajeRepository.create({
+      contenido: dto.contenido,
+      remitenteTipo: RemitenteTipo.DOCENTE,
+      docente,
+      estudiante,
+      estado: MensajeEstado.ENVIADO,
+    });
+    const guardado = await this.mensajeRepository.save(mensaje);
+
+    return {
+      id: guardado.id,
+      remitente: this.nombreCompleto(docente.user),
+      destinatario: this.nombreCompleto(estudiante.user),
+      contenido: guardado.contenido,
+      fecha: guardado.fecha_envio?.toISOString() ?? new Date().toISOString(),
+      tipo: 'enviado' as const,
+    };
+  }
+
+  async getForos(docenteId: number, cursoId?: number) {
+    await this.assertDocente(docenteId);
+    const where: Record<string, unknown> = { docente: { id: docenteId } };
+    if (cursoId) {
+      where.curso = { id: cursoId };
+    }
+
+    const foros = await this.forumRepository.find({
+      where,
+      relations: ['curso', 'respuestas'],
+      order: { fecha_creacion: 'DESC' },
+    });
+
+    return foros.map((foro) => this.mapForoResponse(foro));
+  }
+
+  async getForoById(docenteId: number, foroId: number) {
+    const foro = await this.forumRepository.findOne({
+      where: { id: foroId },
+      relations: ['docente', 'curso', 'respuestas'],
+    });
+    if (!foro) {
+      throw new NotFoundException('Foro no encontrado');
+    }
+    if (foro.docente?.id !== docenteId) {
+      throw new ForbiddenException('No tiene acceso a este foro');
+    }
+    return this.mapForoResponse(foro);
+  }
+
+  async createForo(docenteId: number, dto: CreateForoPanelDto) {
+    const docente = await this.assertDocente(docenteId);
+    const curso = await this.assertCursoDelDocente(docenteId, dto.cursoId);
+
+    const foro = this.forumRepository.create({
+      titulo: dto.titulo,
+      descripcion: dto.descripcion,
+      docente,
+      curso,
+    });
+    const guardado = await this.forumRepository.save(foro);
+    guardado.curso = curso;
+    return this.mapForoResponse(guardado);
+  }
+
+  async updateForo(docenteId: number, foroId: number, dto: UpdateForoPanelDto) {
+    const foro = await this.forumRepository.findOne({
+      where: { id: foroId },
+      relations: ['docente', 'curso', 'respuestas'],
+    });
+    if (!foro) {
+      throw new NotFoundException('Foro no encontrado');
+    }
+    if (foro.docente?.id !== docenteId) {
+      throw new ForbiddenException('Solo el creador puede editar el foro');
+    }
+    if (!dto.titulo && !dto.descripcion) {
+      throw new BadRequestException(
+        'Debe proporcionar al menos titulo o descripcion',
+      );
+    }
+    if (dto.titulo) foro.titulo = dto.titulo;
+    if (dto.descripcion) foro.descripcion = dto.descripcion;
+    const guardado = await this.forumRepository.save(foro);
+    return this.mapForoResponse(guardado);
+  }
+
+  async deleteForo(docenteId: number, foroId: number) {
+    const foro = await this.forumRepository.findOne({
+      where: { id: foroId },
       relations: ['docente'],
     });
-
-    if (!curso) {
-      throw new NotFoundException('Curso no encontrado');
+    if (!foro) {
+      throw new NotFoundException('Foro no encontrado');
     }
-
-    // Verificar que el docente es el dueño del curso
-    if (curso.docente.id !== docenteId) {
-      throw new ForbiddenException(
-        'No tienes permiso para actualizar este curso',
-      );
+    if (foro.docente?.id !== docenteId) {
+      throw new ForbiddenException('Solo el creador puede eliminar el foro');
     }
-
-    Object.assign(curso, data);
-    return this.cursoRepository.save(curso);
+    await this.foroRespuestaRepository.delete({ foro: { id: foroId } });
+    await this.forumRepository.delete(foroId);
+    return { success: true, message: 'Foro eliminado exitosamente' };
   }
 
-  /**
-   * Crear una tarea (simulado)
-   */
-  async createTarea(docenteId: number, data: CreateTareaDto) {
-    // Validar que el docente existe
-    const docente = await this.docenteRepository.findOne({
-      where: { id: docenteId },
+  async getForoRespuestas(docenteId: number, foroId: number) {
+    const foro = await this.forumRepository.findOne({
+      where: { id: foroId },
+      relations: ['docente'],
     });
-
-    if (!docente) {
-      throw new NotFoundException('Docente no encontrado');
+    if (!foro) {
+      throw new NotFoundException('Foro no encontrado');
+    }
+    if (foro.docente?.id !== docenteId) {
+      throw new ForbiddenException('No tiene acceso a este foro');
     }
 
-    // Simulado - en producción, guardar en base de datos
+    const respuestas = await this.foroRespuestaRepository.find({
+      where: { foro: { id: foroId } },
+      relations: ['estudiante', 'estudiante.user'],
+      order: { fecha_creacion: 'DESC' },
+    });
+
+    return respuestas.map((r) => ({
+      id: r.id,
+      mensaje: r.contenido,
+      estudianteNombre: r.estudiante?.user?.name ?? 'Anónimo',
+      estudianteApellido: r.estudiante?.user?.lastName ?? '',
+      fechaCreacion: r.fecha_creacion?.toISOString() ?? new Date().toISOString(),
+    }));
+  }
+
+  async uploadFotoPerfil(
+    userId: number,
+    file: { buffer: Buffer; mimetype: string; size: number; originalname: string },
+  ) {
+    if (!file) {
+      throw new BadRequestException('Debe enviar un archivo en el campo "foto"');
+    }
+    const allowed = ['image/jpeg', 'image/png', 'image/webp'];
+    if (!allowed.includes(file.mimetype)) {
+      throw new BadRequestException(
+        'Tipo de archivo no permitido. Use JPEG, PNG o WebP',
+      );
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      throw new BadRequestException('El archivo no puede superar 5MB');
+    }
+
+    const user = await this.userRepository.findOne({ where: { id: userId } });
+    if (!user) {
+      throw new NotFoundException('Usuario no encontrado');
+    }
+
+    const uploadsDir = join(process.cwd(), 'public', 'uploads', 'docentes');
+    if (!existsSync(uploadsDir)) {
+      mkdirSync(uploadsDir, { recursive: true });
+    }
+
+    const ext = file.originalname.split('.').pop() || 'jpg';
+    const filename = `${userId}-${Date.now()}.${ext}`;
+    await writeFile(join(uploadsDir, filename), file.buffer);
+
+    const url = `/uploads/docentes/${filename}`;
+    user.avatar = url;
+    await this.userRepository.save(user);
+
     return {
-      id: Math.floor(Math.random() * 1000),
-      ...data,
-      estado: 'pendiente',
+      success: true,
+      message: 'Imagen subida correctamente',
+      fotoPerfil: {
+        url,
+        uploadedAt: new Date().toISOString(),
+      },
     };
   }
 
-  /**
-   * Enviar mensaje
-   */
-  async sendMensaje(docenteId: number, data: SendMensajeDto) {
-    const docente = await this.docenteRepository.findOne({
-      where: { id: docenteId },
+  private async generarTareasIniciales(docenteId: number) {
+    const cursos = await this.cursoRepository.find({
+      where: { docente: { id: docenteId } },
+      relations: [
+        'estudiantes',
+        'modulos',
+        'modulos.lecciones',
+        'docente',
+      ],
     });
 
-    if (!docente) {
-      throw new NotFoundException('Docente no encontrado');
+    const docente = await this.assertDocente(docenteId);
+
+    for (const curso of cursos) {
+      const modulo = [...(curso.modulos ?? [])].sort(
+        (a, b) => a.orden - b.orden,
+      )[0];
+      const leccion = modulo?.lecciones?.[0];
+      if (!modulo) continue;
+
+      const tarea = this.tareaRepository.create({
+        titulo: `Actividad: ${modulo.titulo}`,
+        descripcion: leccion
+          ? `Completar la lección "${leccion.titulo}" del módulo ${modulo.titulo}.`
+          : `Actividad del módulo ${modulo.titulo} en ${curso.nombre}.`,
+        fechaVencimiento: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+        estado: EstadoTareaEntidad.PENDIENTE,
+        docente,
+        curso,
+        modulo,
+        leccion: leccion ?? null,
+      });
+      const guardada = await this.tareaRepository.save(tarea);
+      await this.syncEntregasTarea(guardada, curso.estudiantes ?? []);
     }
-
-    // Crear mensaje
-   const mensaje = this.mensajeRepository.create({
-  remitenteTipo: RemitenteTipo.DOCENTE,
-  contenido: data.mensaje,
-  docente,
-    });
-
-    return this.mensajeRepository.save(mensaje);
   }
 
-  /**
-   * Obtener detalles de un curso específico
-   */
-  async getCursoDetalle(docenteId: number, cursoId: number) {
-    const curso = await this.cursoRepository.findOne({
-      where: { id: cursoId },
-      relations: ['docente', 'docente.user', 'estudiantes', 'estudiantes.user'],
-    });
-
-    if (!curso) {
-      throw new NotFoundException('Curso no encontrado');
+  /** Sincroniza entregas de tareas para estudiantes inscritos (idempotente). */
+  private async syncEntregasTarea(tarea: Tarea, estudiantes: Estudiante[]) {
+    for (const estudiante of estudiantes) {
+      const existe = await this.entregaRepository.findOne({
+        where: { tarea: { id: tarea.id }, estudiante: { id: estudiante.id } },
+      });
+      if (!existe) {
+        const entrega = this.entregaRepository.create({
+          tarea,
+          estudiante,
+          estado:
+            Math.random() > 0.35
+              ? EstadoEntregaTarea.ENTREGADO
+              : EstadoEntregaTarea.NO_ENTREGADO,
+          calificacion: null,
+          resultado: null,
+          fechaEntrega:
+            Math.random() > 0.35 ? new Date() : null,
+        });
+        await this.entregaRepository.save(entrega);
+      }
     }
+  }
 
-    // Verificar que el docente es el dueño del curso
-    if (curso.docente.id !== docenteId) {
-      throw new ForbiddenException(
-        'No tienes permiso para acceder a este curso',
-      );
+  private mapTareaResponse(tarea: Tarea) {
+    const ahora = new Date();
+    let estado = tarea.estado;
+    if (
+      estado === EstadoTareaEntidad.PENDIENTE &&
+      tarea.fechaVencimiento < ahora
+    ) {
+      estado = EstadoTareaEntidad.VENCIDA;
     }
 
     return {
-      id: curso.id,
-      nombre: curso.nombre,
-      descripcion: curso.descripcion,
-      dificultad: curso.dificultad,
-      precio: curso.precio,
-      estado: curso.estado,
-      estudiantes: curso.estudiantes?.map(est => ({
-        id: est.id,
-        nombre: est.user?.name || 'Desconocido',
-        apellido: est.user?.lastName || '',
-        email: est.user?.email || '',
-        progreso: est.progreso || 0,
+      id: tarea.id,
+      titulo: tarea.titulo,
+      descripcion: tarea.descripcion,
+      fechaVencimiento: tarea.fechaVencimiento.toISOString(),
+      fechaCreacion: tarea.fechaCreacion?.toISOString(),
+      estudiantes: tarea.entregas?.length ?? 0,
+      estado,
+      modulo: tarea.modulo?.titulo,
+      leccion: tarea.leccion?.titulo,
+      entregas: (tarea.entregas ?? []).map((e) => ({
+        id: e.id,
+        estudianteNombre: e.estudiante?.user?.name ?? 'Estudiante',
+        estudianteApellido: e.estudiante?.user?.lastName ?? '',
+        estado: e.estado,
+        calificacion: e.calificacion,
       })),
-      progreso: this.calcularProgresoCurso(curso),
     };
   }
 
-  /**
-   * Helper: Calcular progreso promedio
-   */
-  private calcularProgresoCurso(curso: Curso): number {
-    if (!curso.estudiantes || curso.estudiantes.length === 0) {
-      return 0;
-    }
+  private mapForoResponse(foro: Forum) {
+    return {
+      id: foro.id,
+      titulo: foro.titulo,
+      descripcion: foro.descripcion,
+      cursoId: foro.curso?.id ?? 0,
+      cursoNombre: foro.curso?.nombre,
+      fechaCreacion: foro.fecha_creacion?.toISOString(),
+      cantidadRespuestas: foro.respuestas?.length ?? 0,
+    };
+  }
 
-    const sumaProgreso = curso.estudiantes.reduce((sum, est) => {
-      return sum + (est.progreso || 0);
-    }, 0);
-
-    return Math.round(sumaProgreso / curso.estudiantes.length);
+  private calcularProgresoPromedio(estudiantes: Estudiante[]): number {
+    if (!estudiantes.length) return 0;
+    const suma = estudiantes.reduce((acc, e) => acc + (e.progreso ?? 0), 0);
+    return Math.round(suma / estudiantes.length);
   }
 }
