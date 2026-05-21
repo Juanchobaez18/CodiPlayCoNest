@@ -24,7 +24,9 @@ import { ContactModule } from './contact/contact.module';
 @Module({
   imports: [
     ConfigModule.forRoot({
-      envFilePath: enviroments[process.env.NODE_ENV || '.env'],
+      envFilePath:
+        enviroments[process.env.NODE_ENV as keyof typeof enviroments] ||
+        enviroments.dev,
       load: [config],
       isGlobal: true,
       validationSchema: Joi.object({
@@ -41,6 +43,9 @@ import { ContactModule } from './contact/contact.module';
         MAIL_PASS: Joi.string().required(),
         MAIL_FROM: Joi.string().required(),
         MAIL_TO: Joi.string().required(),
+        STRIPE_PUBLISHABLE_KEY: Joi.string().required(),
+        STRIPE_SECRET_KEY: Joi.string().required(),
+        STRIPE_WEBHOOK_SECRET: Joi.string().required(),
       }),
     }),
     DatabaseModule,
