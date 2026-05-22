@@ -72,8 +72,20 @@ async update(id: number, updateDocenteDto: UpdateDocenteDto) {
 }
 
   // ❌ DELETE
-async remove(id: number) {
-    const docente = await this.findOne(id);
-    return this.docenteRepo.remove(docente);
-}
+  async remove(id: number) {
+      const docente = await this.findOne(id);
+      return this.docenteRepo.remove(docente);
+  }
+
+  // 🔍 FIND BY USER ID
+  async findByUserId(userId: number, relations: string[] = []) {
+    const docente = await this.docenteRepo.findOne({
+      where: { user: { id: userId } },
+      relations,
+    });
+    if (!docente) {
+      throw new NotFoundException(`Docente con ID de usuario #${userId} no encontrado`);
+    }
+    return docente;
+  }
 }
