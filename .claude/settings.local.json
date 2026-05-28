@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(dir /s /b \"C:\\\\Users\\\\river\\\\OneDrive\\\\Videos\\\\Proyectossena\\\\fronted\\\\frontCodiPlayCoAngular\\\\src\\\\app\")",
+      "Bash(dir /b \"C:\\\\Users\\\\river\\\\OneDrive\\\\Desktop\\\\vistascodi\\\\PanelControlUsuario\\\\\" 2>/dev/null)",
+      "Bash(dir *)",
+      "Bash(npx tsc *)",
+      "Bash(Test-Path *)",
+      "PowerShell(Get-Content *)",
+      "Bash(Copy-Item *)",
+      "PowerShell(Copy-Item *)"
+    ]
+  }
+}

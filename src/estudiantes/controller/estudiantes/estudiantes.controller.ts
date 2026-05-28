@@ -7,6 +7,7 @@ import {
     ParseIntPipe,
     Post,
     Put,
+    Request,
     UseGuards,
     HttpCode,
 } from '@nestjs/common';
@@ -19,14 +20,28 @@ import { Modules } from '../../../auth/decorators/modules.decorator';
 
 @ApiTags('Estudiantes')
 @ApiBearerAuth()
-@Modules('estudiantes')
 @UseGuards(JwtAuthGuard, ModulesGuard)
 @Controller('estudiantes')
 export class EstudiantesController {
 
     constructor(private readonly estudiantesService: EstudiantesService) {}
 
+    @Get('mi-perfil')
+    @UseGuards(JwtAuthGuard)
+    @ApiOperation({ summary: 'Obtener perfil e inscripciones del estudiante autenticado' })
+    getMiPerfil(@Request() req) {
+        return this.estudiantesService.findByUserId(req.user.id);
+    }
+
+    @Post('mis-lecciones/:leccionId/completar')
+    @UseGuards(JwtAuthGuard)
+    @ApiOperation({ summary: 'Marcar una lección como completada por el estudiante autenticado' })
+    marcarLeccionCompletada(@Request() req, @Param('leccionId', ParseIntPipe) leccionId: number) {
+        return this.estudiantesService.marcarLeccionCompletada(req.user.id, leccionId);
+    }
+
     @Get()
+    @Modules('estudiantes')
     @ApiOperation({ summary: 'Obtener todos los estudiantes' })
     @ApiResponse({ status: 200, description: 'Lista de estudiantes' })
     findAll() {
@@ -39,6 +54,7 @@ findByUserId(@Param('userId', ParseIntPipe) userId: number) {
 }
 
     @Get(':id')
+    @Modules('estudiantes')
     @ApiOperation({ summary: 'Obtener un estudiante por ID' })
     @ApiResponse({ status: 200, description: 'Estudiante encontrado' })
     @ApiResponse({ status: 404, description: 'Estudiante no encontrado' })
@@ -47,6 +63,7 @@ findByUserId(@Param('userId', ParseIntPipe) userId: number) {
     }
 
     @Post()
+    @Modules('estudiantes')
     @ApiOperation({ summary: 'Crear un nuevo estudiante' })
     @ApiResponse({ status: 201, description: 'Estudiante creado exitosamente' })
     create(@Body() createEstudianteDto: CreateEstudianteDto) {
@@ -54,6 +71,7 @@ findByUserId(@Param('userId', ParseIntPipe) userId: number) {
     }
 
     @Put(':id')
+    @Modules('estudiantes')
     @ApiOperation({ summary: 'Actualizar un estudiante por ID' })
     @ApiResponse({ status: 200, description: 'Estudiante actualizado exitosamente' })
     @ApiResponse({ status: 404, description: 'Estudiante no encontrado' })
@@ -65,6 +83,7 @@ findByUserId(@Param('userId', ParseIntPipe) userId: number) {
     }
 
     @Delete(':id')
+    @Modules('estudiantes')
     @HttpCode(204)
     @ApiOperation({ summary: 'Eliminar un estudiante por ID' })
     @ApiResponse({ status: 204, description: 'Estudiante eliminado exitosamente' })

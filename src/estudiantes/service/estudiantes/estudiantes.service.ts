@@ -95,10 +95,59 @@ export class EstudiantesService {
             user: true,
             cursos: true,
             foros: true,
-            mensajes: true,
+            mensajes: {
+                docente: {
+                    user: true
+                }
+            },
+            leccionesCompletadas: true,
         },
     });
     if (!estudiante) throw new NotFoundException(`Estudiante del usuario #${userId} no encontrado`);
     return estudiante;
+}
+
+async marcarLeccionCompletada(userId: number, leccionId: number) {
+    const estudiante = await this.estudianteRepo.findOne({
+        where: { user: { id: userId } },
+        relations: {
+            leccionesCompletadas: true,
+            cursos: {
+                modulos: {
+                    lecciones: true
+                }
+            }
+        },
+    });
+    
+    if (!estudiante) throw new NotFoundException(`Estudiante del usuario #${userId} no encontrado`);
+
+    const yaCompletada = estudiante.leccionesCompletadas.find(l => l.id === leccionId);
+    if (!yaCompletada) {
+        estudiante.leccionesCompletadas.push({ id: leccionId } as any);
+    }
+
+    let totalLecciones = 0;
+    if (estudiante.cursos) {
+        for (const c of estudiante.cursos) {
+            if (c.modulos) {
+                for (const m of c.modulos) {
+                    if (m.lecciones) {
+                        totalLecciones += m.lecciones.length;
+                    }
+                }
+            }
+        }
+    }
+
+    const completadas = estudiante.leccionesCompletadas.length;
+    if (totalLecciones > 0) {
+        estudiante.progreso = Math.round((completadas / totalLecciones) * 100);
+        if (estudiante.progreso > 100) estudiante.progreso = 100;
+    } else {
+        estudiante.progreso = Math.min(100, completadas * 10);
+    }
+
+    return await this.estudianteRepo.save(estudiante);
 }
 }

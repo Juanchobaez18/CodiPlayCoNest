@@ -305,30 +305,79 @@ export class DocentePanelService {
 
   async getTareas(docenteId: number, cursoId?: number) {
     await this.assertDocente(docenteId);
+
+    // Ensure every course owned by this docente has at least one task,
+    // and every enrolled student has a delivery record.
+    await this.ensureTareasParaCursos(docenteId, cursoId);
+
     const where: Record<string, unknown> = { docente: { id: docenteId } };
     if (cursoId) {
       where.curso = { id: cursoId };
     }
 
-    let count = await this.tareaRepository.count({ where });
-    if (count === 0) {
-      await this.generarTareasIniciales(docenteId);
-    }
+    return (
+      await this.tareaRepository.find({
+        where,
+        relations: [
+          'curso',
+          'modulo',
+          'leccion',
+          'entregas',
+          'entregas.estudiante',
+          'entregas.estudiante.user',
+        ],
+        order: { fechaVencimiento: 'DESC' },
+      })
+    ).map((tarea) => this.mapTareaResponse(tarea));
+  }
 
-    const tareas = await this.tareaRepository.find({
-      where,
-      relations: [
-        'curso',
-        'modulo',
-        'leccion',
-        'entregas',
-        'entregas.estudiante',
-        'entregas.estudiante.user',
-      ],
-      order: { fechaVencimiento: 'DESC' },
+  private async ensureTareasParaCursos(docenteId: number, cursoId?: number) {
+    const docente = await this.assertDocente(docenteId);
+
+    const cursosWhere: Record<string, unknown> = { docente: { id: docenteId } };
+    if (cursoId) cursosWhere.id = cursoId;
+
+    const cursos = await this.cursoRepository.find({
+      where: cursosWhere,
+      relations: ['estudiantes', 'modulos', 'modulos.lecciones'],
     });
 
-    return tareas.map((tarea) => this.mapTareaResponse(tarea));
+    for (const curso of cursos) {
+      // Create a task for this course if none exists yet
+      const tareaExistente = await this.tareaRepository.findOne({
+        where: { docente: { id: docenteId }, curso: { id: curso.id } },
+        relations: ['entregas', 'entregas.estudiante'],
+      });
+
+      let tarea: Tarea;
+      if (!tareaExistente) {
+        const modulo = [...(curso.modulos ?? [])].sort((a, b) => a.orden - b.orden)[0];
+        const leccion = modulo?.lecciones?.[0];
+        tarea = await this.tareaRepository.save(
+          this.tareaRepository.create({
+            titulo: modulo
+              ? `Actividad: ${modulo.titulo}`
+              : `Inscripción: ${curso.nombre}`,
+            descripcion: leccion
+              ? `Completar la lección "${leccion.titulo}" del módulo ${modulo!.titulo}.`
+              : modulo
+              ? `Actividad del módulo ${modulo.titulo} en ${curso.nombre}.`
+              : `Revisar y aprobar la inscripción de los estudiantes al curso "${curso.nombre}".`,
+            fechaVencimiento: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+            estado: EstadoTareaEntidad.PENDIENTE,
+            docente,
+            curso,
+            modulo: modulo ?? null,
+            leccion: leccion ?? null,
+          }),
+        );
+      } else {
+        tarea = tareaExistente;
+      }
+
+      // Always sync enrolled students so late-enrollers appear
+      await this.syncEntregasTarea(tarea, curso.estudiantes ?? []);
+    }
   }
 
   async calificarTarea(docenteId: number, dto: CalificarTareaDto) {
@@ -552,15 +601,18 @@ export class DocentePanelService {
 
     const respuestas = await this.foroRespuestaRepository.find({
       where: { foro: { id: foroId } },
-      relations: ['estudiante', 'estudiante.user'],
-      order: { fecha_creacion: 'DESC' },
+      relations: ['estudiante', 'estudiante.user', 'docente', 'docente.user'],
+      order: { fecha_creacion: 'ASC' },
     });
 
     return respuestas.map((r) => ({
       id: r.id,
       mensaje: r.contenido,
-      estudianteNombre: r.estudiante?.user?.name ?? 'Anónimo',
-      estudianteApellido: r.estudiante?.user?.lastName ?? '',
+      estudianteNombre: r.docente ? (r.docente.user?.name ?? 'Docente') : (r.estudiante?.user?.name ?? 'Anónimo'),
+      estudianteApellido: r.docente ? (r.docente.user?.lastName ?? '') : (r.estudiante?.user?.lastName ?? ''),
+      esDocente: !!r.docente,
+      docenteId: r.docente?.id,
+      estudianteId: r.estudiante?.id,
       fechaCreacion: r.fecha_creacion?.toISOString() ?? new Date().toISOString(),
     }));
   }
@@ -610,43 +662,6 @@ export class DocentePanelService {
     };
   }
 
-  private async generarTareasIniciales(docenteId: number) {
-    const cursos = await this.cursoRepository.find({
-      where: { docente: { id: docenteId } },
-      relations: [
-        'estudiantes',
-        'modulos',
-        'modulos.lecciones',
-        'docente',
-      ],
-    });
-
-    const docente = await this.assertDocente(docenteId);
-
-    for (const curso of cursos) {
-      const modulo = [...(curso.modulos ?? [])].sort(
-        (a, b) => a.orden - b.orden,
-      )[0];
-      const leccion = modulo?.lecciones?.[0];
-      if (!modulo) continue;
-
-      const tarea = this.tareaRepository.create({
-        titulo: `Actividad: ${modulo.titulo}`,
-        descripcion: leccion
-          ? `Completar la lección "${leccion.titulo}" del módulo ${modulo.titulo}.`
-          : `Actividad del módulo ${modulo.titulo} en ${curso.nombre}.`,
-        fechaVencimiento: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-        estado: EstadoTareaEntidad.PENDIENTE,
-        docente,
-        curso,
-        modulo,
-        leccion: leccion ?? null,
-      });
-      const guardada = await this.tareaRepository.save(tarea);
-      await this.syncEntregasTarea(guardada, curso.estudiantes ?? []);
-    }
-  }
-
   /** Sincroniza entregas de tareas para estudiantes inscritos (idempotente). */
   private async syncEntregasTarea(tarea: Tarea, estudiantes: Estudiante[]) {
     for (const estudiante of estudiantes) {
@@ -654,19 +669,16 @@ export class DocentePanelService {
         where: { tarea: { id: tarea.id }, estudiante: { id: estudiante.id } },
       });
       if (!existe) {
-        const entrega = this.entregaRepository.create({
-          tarea,
-          estudiante,
-          estado:
-            Math.random() > 0.35
-              ? EstadoEntregaTarea.ENTREGADO
-              : EstadoEntregaTarea.NO_ENTREGADO,
-          calificacion: null,
-          resultado: null,
-          fechaEntrega:
-            Math.random() > 0.35 ? new Date() : null,
-        });
-        await this.entregaRepository.save(entrega);
+        await this.entregaRepository.save(
+          this.entregaRepository.create({
+            tarea,
+            estudiante,
+            estado: EstadoEntregaTarea.NO_ENTREGADO,
+            calificacion: null,
+            resultado: null,
+            fechaEntrega: null,
+          }),
+        );
       }
     }
   }
@@ -691,12 +703,15 @@ export class DocentePanelService {
       estado,
       modulo: tarea.modulo?.titulo,
       leccion: tarea.leccion?.titulo,
+      cursoId: tarea.curso?.id,
+      cursoNombre: tarea.curso?.nombre,
       entregas: (tarea.entregas ?? []).map((e) => ({
         id: e.id,
         estudianteNombre: e.estudiante?.user?.name ?? 'Estudiante',
         estudianteApellido: e.estudiante?.user?.lastName ?? '',
         estado: e.estado,
         calificacion: e.calificacion,
+        resultado: e.resultado,
       })),
     };
   }

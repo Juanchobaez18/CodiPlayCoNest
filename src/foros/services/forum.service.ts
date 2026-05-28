@@ -25,7 +25,16 @@ export class ForumService {
     async findOne(id: number) {
         const forum = await this.forumRepo.findOne({
             where: { id },
-            relations: ['estudiantes', 'docente', 'modulo']
+            relations: [
+                'estudiantes', 
+                'docente', 
+                'modulo', 
+                'respuestas', 
+                'respuestas.estudiante', 
+                'respuestas.estudiante.user',
+                'respuestas.docente',
+                'respuestas.docente.user'
+            ]
         });
         if (!forum) {
             throw new NotFoundException(`Forum #${id} not found`);
