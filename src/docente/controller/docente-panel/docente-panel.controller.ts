@@ -2,6 +2,8 @@ import {
   Controller,
   Get,
   Post,
+  Put,
+  Delete,
   Body,
   UseGuards,
   Request,
@@ -22,6 +24,8 @@ import { DocentePanelService } from '../../service/docente-panel/docente-panel.s
 import {
   SendMensajePanelDto,
   CalificarTareaDto,
+  CreateForoPanelDto,
+  UpdateForoPanelDto,
 } from '../../dtos/docente-panel-api.dto';
 import { RequiereAccesoDocente } from '../../decorators/acceso-funcional.decorator';
 
@@ -139,6 +143,47 @@ export class DocentePanelController {
       this.resolveDocenteId(req),
       cursoId ? Number(cursoId) : undefined,
     );
+  }
+
+  @Post('foros')
+  createForo(
+    @Request() req: { docenteId?: number; user?: { docente?: { id?: number } } },
+    @Body() dto: CreateForoPanelDto,
+  ) {
+    return this.docentePanelService.createForo(this.resolveDocenteId(req), dto);
+  }
+
+  @Put('foros/:id')
+  updateForo(
+    @Request() req: { docenteId?: number; user?: { docente?: { id?: number } } },
+    @Param('id', ParseIntPipe) foroId: number,
+    @Body() dto: UpdateForoPanelDto,
+  ) {
+    return this.docentePanelService.updateForo(this.resolveDocenteId(req), foroId, dto);
+  }
+
+  @Delete('foros/:id')
+  deleteForo(
+    @Request() req: { docenteId?: number; user?: { docente?: { id?: number } } },
+    @Param('id', ParseIntPipe) foroId: number,
+  ) {
+    return this.docentePanelService.deleteForo(this.resolveDocenteId(req), foroId);
+  }
+
+  @Get('foros/:id')
+  getForoById(
+    @Request() req: { docenteId?: number; user?: { docente?: { id?: number } } },
+    @Param('id', ParseIntPipe) foroId: number,
+  ) {
+    return this.docentePanelService.getForoById(this.resolveDocenteId(req), foroId);
+  }
+
+  @Get('foros/:id/respuestas')
+  getForoRespuestas(
+    @Request() req: { docenteId?: number; user?: { docente?: { id?: number } } },
+    @Param('id', ParseIntPipe) foroId: number,
+  ) {
+    return this.docentePanelService.getForoRespuestas(this.resolveDocenteId(req), foroId);
   }
 
   @Post('subir-foto')

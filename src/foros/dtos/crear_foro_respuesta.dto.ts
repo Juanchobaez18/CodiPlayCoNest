@@ -7,8 +7,8 @@ export class CrearForoRespuestaDto {
   contenido: string;
 
   @IsNumber()
-  @IsNotEmpty()
-  foroId: number;
+  @IsOptional()
+  foroId?: number;
 
   @IsNumber()
   @IsOptional()

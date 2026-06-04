@@ -32,5 +32,6 @@ export default registerAs('config', () => {
             webhookSecret: process.env.STRIPE_WEBHOOK_SECRET,
             currency: process.env.STRIPE_CURRENCY || 'usd',
         },
+        frontendUrl: process.env.FRONTEND_URL || 'http://localhost:4200',
     }
 });

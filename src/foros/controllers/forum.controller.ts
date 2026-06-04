@@ -39,7 +39,6 @@ export class ForumController {
     return id != null && Number(id) > 0 ? Number(id) : null;
   }
 
-  @Modules('foros')
   @Get()
   getForums() {
     return this.forumService.findAll();

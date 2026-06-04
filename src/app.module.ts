@@ -20,6 +20,7 @@ import config from './config';
 import { PaymentsModule } from './payments/payments.module';
 import { ForosModule } from './foros/foros.module';
 import { ContactModule } from './contact/contact.module';
+import { AdminModule } from './admin/admin.module';
 
 @Module({
   imports: [
@@ -62,6 +63,7 @@ import { ContactModule } from './contact/contact.module';
     ForosModule,
     MensajesModule,
     ContactModule,
+    AdminModule,
   ],
   controllers: [AppController],
   providers: [AppService],

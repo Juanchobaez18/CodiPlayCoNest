@@ -35,14 +35,28 @@ export class AdminService {
   ) {}
 
   async getDashboardStats() {
-    const estudiantes = await this.estudiantesService.findAll();
-    const cursos = await this.cursoService.findAll();
-    const docentes = await this.docenteService.findAll();
+    const [estudiantes, cursos, docentes] = await Promise.all([
+      this.estudiantesService.findAll(),
+      this.cursoService.findAll(),
+      this.docenteService.findAll(),
+    ]);
+
+    const totalEstudiantes = estudiantes.length;
+    const totalEstudiantesActivos = estudiantes.filter(
+      (e) => e.user?.isActive,
+    ).length;
+
+    const tasaExito =
+      totalEstudiantes > 0
+        ? Math.round((totalEstudiantesActivos / totalEstudiantes) * 100)
+        : 0;
 
     return {
-      totalEstudiantes: estudiantes.length,
+      totalEstudiantes,
+      totalEstudiantesActivos,
       totalCursosActivos: cursos.filter((c) => c.estado).length,
       totalDocentesActivos: docentes.filter((d) => d.user?.isActive).length,
+      tasaExito,
     };
   }
 
