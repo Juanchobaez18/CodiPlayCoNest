@@ -40,6 +40,16 @@ export class EstudiantesController {
         return this.estudiantesService.marcarLeccionCompletada(req.user.id, leccionId);
     }
 
+    @Post('mis-tareas/entregar')
+    @UseGuards(JwtAuthGuard)
+    @ApiOperation({ summary: 'Marcar la tarea de una lección como entregada para revisión del docente' })
+    marcarTareaEntregada(
+        @Request() req,
+        @Body() body: { moduloOrden: number; leccionOrden: number },
+    ) {
+        return this.estudiantesService.marcarTareaEntregada(req.user.id, body.moduloOrden, body.leccionOrden);
+    }
+
     @Get()
     @Modules('estudiantes')
     @ApiOperation({ summary: 'Obtener todos los estudiantes' })

@@ -381,10 +381,17 @@ export class DocentePanelService {
   }
 
   async calificarTarea(docenteId: number, dto: CalificarTareaDto) {
-    await this.assertDocente(docenteId);
+    const docente = await this.assertDocente(docenteId);
     const entrega = await this.entregaRepository.findOne({
       where: { id: dto.entregaId },
-      relations: ['tarea', 'tarea.docente', 'estudiante'],
+      relations: [
+        'tarea',
+        'tarea.docente',
+        'tarea.leccion',
+        'tarea.modulo',
+        'estudiante',
+        'estudiante.user',
+      ],
     });
 
     if (!entrega) {
@@ -415,6 +422,50 @@ export class DocentePanelService {
     if (pendientes === 0) {
       entrega.tarea.estado = EstadoTareaEntidad.CALIFICADA;
       await this.tareaRepository.save(entrega.tarea);
+    }
+
+    // When NOT approved: send a message to the student to repeat the lesson
+    if (dto.resultado === 'NO_APROBADO') {
+      const leccionTitulo = entrega.tarea.leccion?.titulo ?? 'la lección asignada';
+      const mensaje = this.mensajeRepository.create({
+        contenido: `Tu trabajo en "${leccionTitulo}" ha sido revisado. Debes repetir esta lección para poder continuar. Revisa los materiales y vuelve a intentarlo.`,
+        remitenteTipo: RemitenteTipo.DOCENTE,
+        docente,
+        estudiante: entrega.estudiante,
+        estado: MensajeEstado.ENVIADO,
+      });
+      await this.mensajeRepository.save(mensaje);
+    }
+
+    // When approved: mark the lesson as completed in the student's progress
+    if (dto.resultado === 'APROBADO' && entrega.tarea.leccion) {
+      const estudianteConProgreso = await this.estudianteRepository.findOne({
+        where: { id: entrega.estudiante.id },
+        relations: ['leccionesCompletadas', 'cursos', 'cursos.modulos', 'cursos.modulos.lecciones'],
+      });
+      if (estudianteConProgreso) {
+        const completadas = estudianteConProgreso.leccionesCompletadas ?? [];
+        const yaCompletada = completadas.find(
+          (l) => l.id === entrega.tarea.leccion!.id,
+        );
+        if (!yaCompletada) {
+          completadas.push(entrega.tarea.leccion);
+          estudianteConProgreso.leccionesCompletadas = completadas;
+        }
+        let totalLecciones = 0;
+        for (const c of estudianteConProgreso.cursos ?? []) {
+          for (const m of c.modulos ?? []) {
+            totalLecciones += m.lecciones?.length ?? 0;
+          }
+        }
+        if (totalLecciones > 0) {
+          estudianteConProgreso.progreso = Math.min(
+            100,
+            Math.round((estudianteConProgreso.leccionesCompletadas.length / totalLecciones) * 100),
+          );
+        }
+        await this.estudianteRepository.save(estudianteConProgreso);
+      }
     }
 
     return {

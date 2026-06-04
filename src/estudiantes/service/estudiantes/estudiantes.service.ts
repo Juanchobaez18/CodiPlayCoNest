@@ -4,12 +4,14 @@ import { Repository } from 'typeorm';
 import { Estudiante } from '../../entities/estudiantes.entity';
 import { CreateEstudianteDto, UpdateEstudianteDto } from '../../dtos/estudiante.dto';
 import { UsersService } from '../../../users/services/users/users.service';
+import { TareaEntrega, EstadoEntregaTarea, ResultadoCalificacion } from '../../../docente/entities/tarea-entrega.entity';
 
 @Injectable()
 export class EstudiantesService {
 
     constructor(
         @InjectRepository(Estudiante) private estudianteRepo: Repository<Estudiante>,
+        @InjectRepository(TareaEntrega) private entregaRepo: Repository<TareaEntrega>,
         private usersService: UsersService,
     ) {}
 
@@ -104,7 +106,89 @@ export class EstudiantesService {
         },
     });
     if (!estudiante) throw new NotFoundException(`Estudiante del usuario #${userId} no encontrado`);
-    return estudiante;
+
+    const tareasEntregas = await this.entregaRepo.find({
+        where: { estudiante: { id: estudiante.id } },
+        relations: {
+            tarea: {
+                leccion: { modulo: true },
+                modulo: true,
+            },
+        },
+    });
+
+    return {
+        ...estudiante,
+        tareasEntregas: tareasEntregas.map((e) => ({
+            id: e.id,
+            resultado: e.resultado,
+            estado: e.estado,
+            tarea: e.tarea
+                ? {
+                      id: e.tarea.id,
+                      titulo: e.tarea.titulo,
+                      leccion: e.tarea.leccion
+                          ? {
+                                id: e.tarea.leccion.id,
+                                titulo: e.tarea.leccion.titulo,
+                                orden: Number(e.tarea.leccion.orden),
+                            }
+                          : null,
+                      modulo: e.tarea.modulo
+                          ? {
+                                id: e.tarea.modulo.id,
+                                titulo: e.tarea.modulo.titulo,
+                                orden: e.tarea.modulo.orden,
+                            }
+                          : null,
+                  }
+                : null,
+        })),
+    };
+}
+
+async marcarTareaEntregada(userId: number, moduloOrden: number, leccionOrden: number) {
+    const estudiante = await this.estudianteRepo.findOne({
+        where: { user: { id: userId } },
+    });
+    if (!estudiante) throw new NotFoundException(`Estudiante del usuario #${userId} no encontrado`);
+
+    // QueryBuilder with explicit JOINs (TypeORM does not expose FK cols directly in WHERE)
+    const entrega = await this.entregaRepo
+        .createQueryBuilder('entrega')
+        .innerJoin('entrega.estudiante', 'est')
+        .innerJoinAndSelect('entrega.tarea', 'tarea')
+        .innerJoinAndSelect('tarea.modulo', 'modulo')
+        .leftJoinAndSelect('tarea.leccion', 'leccion')
+        .where('est.id = :estudianteId', { estudianteId: estudiante.id })
+        .andWhere('modulo.orden = :moduloOrden', { moduloOrden })
+        .andWhere('leccion.orden = :leccionOrden', { leccionOrden: String(leccionOrden) })
+        .getOne();
+
+    if (!entrega) {
+        return { success: false, message: 'No se encontró una tarea asociada a esta lección' };
+    }
+
+    if (
+        entrega.estado === EstadoEntregaTarea.CALIFICADO &&
+        entrega.resultado === ResultadoCalificacion.NO_APROBADO
+    ) {
+        // Student is re-submitting after rejection — reset so teacher can review again
+        entrega.estado = EstadoEntregaTarea.ENTREGADO;
+        entrega.resultado = null;
+        entrega.calificacion = null;
+        entrega.fechaEntrega = new Date();
+        await this.entregaRepo.save(entrega);
+    } else if (entrega.estado !== EstadoEntregaTarea.CALIFICADO) {
+        entrega.estado = EstadoEntregaTarea.ENTREGADO;
+        if (!entrega.fechaEntrega) {
+            entrega.fechaEntrega = new Date();
+        }
+        await this.entregaRepo.save(entrega);
+    }
+    // If already calificado + APROBADO: nothing to do (shouldn't re-submit an approved lesson)
+
+    return { success: true, message: 'Lección enviada para revisión del docente' };
 }
 
 async marcarLeccionCompletada(userId: number, leccionId: number) {
