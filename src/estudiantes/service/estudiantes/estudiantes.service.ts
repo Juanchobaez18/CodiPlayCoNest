@@ -5,6 +5,7 @@ import { Estudiante } from '../../entities/estudiantes.entity';
 import { CreateEstudianteDto, UpdateEstudianteDto } from '../../dtos/estudiante.dto';
 import { UsersService } from '../../../users/services/users/users.service';
 import { TareaEntrega, EstadoEntregaTarea, ResultadoCalificacion } from '../../../docente/entities/tarea-entrega.entity';
+import { Lecciones } from '../../../lecciones/entities/lecciones.entity';
 
 @Injectable()
 export class EstudiantesService {
@@ -12,6 +13,7 @@ export class EstudiantesService {
     constructor(
         @InjectRepository(Estudiante) private estudianteRepo: Repository<Estudiante>,
         @InjectRepository(TareaEntrega) private entregaRepo: Repository<TareaEntrega>,
+        @InjectRepository(Lecciones) private leccionesRepo: Repository<Lecciones>,
         private usersService: UsersService,
     ) {}
 
@@ -166,7 +168,31 @@ async marcarTareaEntregada(userId: number, moduloOrden: number, leccionOrden: nu
         .getOne();
 
     if (!entrega) {
-        return { success: false, message: 'No se encontró una tarea asociada a esta lección' };
+        // Sin gate de docente: buscar la lección dentro de los cursos inscritos del estudiante
+        const estudianteConCursos = await this.estudianteRepo.findOne({
+            where: { id: estudiante.id },
+            relations: ['cursos'],
+        });
+        const cursoIds = estudianteConCursos?.cursos.map(c => c.id) ?? [];
+
+        if (cursoIds.length === 0) {
+            return { success: false, completed: false, message: 'No se encontró una tarea asociada a esta lección' };
+        }
+
+        const leccion = await this.leccionesRepo
+            .createQueryBuilder('leccion')
+            .innerJoin('leccion.modulo', 'modulo')
+            .innerJoin('modulo.curso', 'curso')
+            .where('leccion.orden = :leccionOrden', { leccionOrden: String(leccionOrden) })
+            .andWhere('modulo.orden = :moduloOrden', { moduloOrden })
+            .andWhere('curso.id IN (:...cursoIds)', { cursoIds })
+            .getOne();
+
+        if (leccion) {
+            await this.marcarLeccionCompletada(userId, leccion.id);
+            return { success: true, completed: true, message: 'Lección completada exitosamente' };
+        }
+        return { success: false, completed: false, message: 'No se encontró una tarea asociada a esta lección' };
     }
 
     if (

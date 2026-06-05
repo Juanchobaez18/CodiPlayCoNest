@@ -36,9 +36,9 @@ export class Curso {
   estado: boolean;
 
   // 🔹 Relación: muchos cursos → un docente
-  @ManyToOne(() => Docente, (docente) => docente.cursos)
+  @ManyToOne(() => Docente, (docente) => docente.cursos, { nullable: true, onDelete: 'SET NULL' })
   @JoinColumn({ name: 'docente_id' })
-  docente: Docente;
+  docente: Docente | null;
 
   @OneToMany(() => Modulos, (modulos) => modulos.curso)
  modulos: Modulos[];

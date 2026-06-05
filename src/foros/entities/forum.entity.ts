@@ -38,7 +38,7 @@ export class Forum {
     })
     estudiantes: Estudiante[];
 
-    @ManyToOne(() => Docente, docente => docente.foros, { nullable: true })
+    @ManyToOne(() => Docente, docente => docente.foros, { nullable: true, onDelete: 'SET NULL' })
     @JoinColumn({ name: 'docente_id' })
     docente: Docente | null;
 
