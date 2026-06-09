@@ -8,7 +8,31 @@
       "Bash(Test-Path *)",
       "PowerShell(Get-Content *)",
       "Bash(Copy-Item *)",
-      "PowerShell(Copy-Item *)"
+      "PowerShell(Copy-Item *)",
+      "Read(//mnt/c/**)",
+      "Read(//c/CodiplayCo//**)",
+      "Bash(Get-ChildItem -Path \"C:\\\\CodiplayCo\\\\frontCodiPlayCoAngular\\\\src\\\\app\" -Recurse -Filter \"*.ts\")",
+      "Bash(Select-Object FullName)",
+      "PowerShell(Set-Location \"C:\\\\CodiplayCo\\\\CodiPlayCoNest\"; $out = cmd /c \"npx tsc --noEmit 2>&1\"; Write-Host \"Exit: $LASTEXITCODE\"; $out | Where-Object { $_ -match \"estudiante|[Ll]eccion\" } | Select-Object -First 10)",
+      "PowerShell(Set-Location \"C:\\\\CodiplayCo\\\\CodiPlayCoNest\"; $out = cmd /c \"npx tsc --noEmit 2>&1\"; Write-Host \\($out -join \"`n\"\\) | Select-Object -First 50)",
+      "PowerShell(Set-Location \"C:\\\\CodiplayCo\\\\frontCodiPlayCoAngular\"; $out = cmd /c \"npx tsc --noEmit 2>&1\"; Write-Host \"Exit: $LASTEXITCODE\"; $out | Where-Object { $_ -match \"estudiante-layout\" } | Select-Object -First 20)",
+      "PowerShell(Get-NetTCPConnection *)",
+      "PowerShell(Start-Process -FilePath \"cmd.exe\" -ArgumentList \"/c cd C:\\\\CodiplayCo\\\\CodiPlayCoNest && npm run start:dev > C:\\\\Temp\\\\nest-log.txt 2>&1\" -WindowStyle Hidden; Start-Sleep -Seconds 2; Write-Host \"Backend started\")",
+      "PowerShell($maxWait = 30; $waited = 0; while \\($waited -lt $maxWait\\) { try { $r = Invoke-WebRequest -Uri \"http://localhost:3000/auth/roles-disponibles\" -UseBasicParsing -TimeoutSec 3 -ErrorAction Stop; Write-Host \"Backend ready: $\\($r.StatusCode\\)\"; break } catch { Start-Sleep -Seconds 2; $waited += 2; Write-Host \"Waiting... ${waited}s\" } })",
+      "PowerShell($r = Invoke-WebRequest -Uri \"http://localhost:3000/auth/roles-disponibles\" -UseBasicParsing; $r.Content)",
+      "PowerShell($body = '{\"email\":\"admin@codiplay.co\",\"password\":\"admin123\"}'; $r = Invoke-WebRequest -Uri \"http://localhost:3000/auth/login\" -Method POST -ContentType \"application/json\" -Body $body -UseBasicParsing; $r.Content | ConvertFrom-Json | ConvertTo-Json -Depth 5)",
+      "PowerShell($token = \\(Invoke-WebRequest -Uri \"http://localhost:3000/auth/login\" -Method POST -ContentType \"application/json\" -Body '{\"email\":\"admin@codiplay.co\",\"password\":\"admin123\"}' -UseBasicParsing | ConvertFrom-Json\\).access_token; $r = Invoke-WebRequest -Uri \"http://localhost:3000/admin/users/managed\" -Headers @{Authorization=\"Bearer $token\"} -UseBasicParsing; \\($r.Content | ConvertFrom-Json\\) | ForEach-Object { \"$\\($_.id\\) | $\\($_.email\\) | $\\(\\($_.roles | ForEach-Object { $_.name }\\) -join ','\\)\" })",
+      "PowerShell(npx playwright --version 2>&1 | Select-Object -First 1)",
+      "PowerShell(npx playwright install chromium --with-deps 2>&1 | Select-Object -Last 3)",
+      "PowerShell(npx playwright install chromium 2>&1 | Select-Object -Last 5)",
+      "PowerShell(New-Item *)",
+      "PowerShell(Set-Location *)",
+      "PowerShell($env:NODE_PATH = \"$env:TEMP\\\\pw-test\\\\node_modules\"; node --experimental-vm-modules C:\\\\Temp\\\\login-test.mjs 2>&1 | Select-Object -First 30)",
+      "Bash(cd /tmp)",
+      "Bash(node /tmp/login-extra.js)",
+      "PowerShell(Set-Location \"C:\\\\CodiplayCo\\\\CodiPlayCoNest\"; $out = cmd /c \"npx tsc --noEmit 2>&1\"; Write-Host \"Exit: $LASTEXITCODE\"; $out | Where-Object { $_ -match \"error TS\" } | Select-Object -First 20)",
+      "PowerShell(Set-Location \"C:\\\\CodiplayCo\\\\frontCodiPlayCoAngular\"; $out = cmd /c \"npx tsc --noEmit 2>&1\"; Write-Host \"Exit: $LASTEXITCODE\"; $out | Where-Object { $_ -match \"error TS\" } | Select-Object -First 20)",
+      "PowerShell(Set-Location \"C:\\\\CodiplayCo\\\\CodiPlayCoNest\"; $out = cmd /c \"npx tsc --noEmit 2>&1\"; $out | Where-Object { $_ -match \"error TS\" -and $_ -notmatch \"\\\\.spec\\\\.ts\" } | Select-Object -First 20; Write-Host \"Non-spec errors: $\\(\\($out | Where-Object { $_ -match 'error TS' -and $_ -notmatch '\\\\.spec\\\\.ts' }\\).Count\\)\")"
     ]
   }
 }
