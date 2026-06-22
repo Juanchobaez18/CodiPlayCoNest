@@ -2,6 +2,7 @@ import { BadRequestException, Body, Controller, Delete, Get, Param, ParseIntPipe
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiBearerAuth, ApiBody, ApiConsumes } from '@nestjs/swagger';
 import { diskStorage } from 'multer';
+import type { File as MulterFile } from 'multer';
 import { extname } from 'path';
 import { randomUUID } from 'crypto';
 import { Modules } from '../../../auth/decorators/modules.decorator';
@@ -15,7 +16,7 @@ const avatarStorage = diskStorage({
     filename: (_req, file, cb) => cb(null, `${randomUUID()}${extname(file.originalname)}`),
 });
 
-const avatarFilter = (_req: any, file: Express.Multer.File, cb: any) => {
+const avatarFilter = (_req: any, file: MulterFile, cb: any) => {
     const allowedMimes = ['image/jpeg', 'image/png', 'image/webp'];
     const allowedExts = /\.(jpg|jpeg|png|webp)$/i;
     if (!allowedMimes.includes(file.mimetype) || !allowedExts.test(extname(file.originalname))) {
@@ -63,7 +64,7 @@ export class UsersController {
     @UseInterceptors(FileInterceptor('avatar', { storage: avatarStorage, fileFilter: avatarFilter, limits: { fileSize: 2 * 1024 * 1024 } }))
     uploadAvatar(
         @Param('userId', ParseIntPipe) userId: number,
-        @UploadedFile() file: Express.Multer.File,
+        @UploadedFile() file: MulterFile,
     ) {
         if (!file) throw new BadRequestException('No file uploaded');
         return this.usersService.updateAvatar(userId, `uploads/avatars/${file.filename}`);
