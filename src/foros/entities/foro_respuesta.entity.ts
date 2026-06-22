@@ -18,9 +18,9 @@ export class ForoRespuesta {
   @ManyToOne(() => Forum, (forum) => forum.respuestas)
   foro: Forum;
 
-  @ManyToOne(() => Estudiante, (estudiante) => estudiante.foroRespuestas, { nullable: true })
+  @ManyToOne(() => Estudiante, (estudiante) => estudiante.foroRespuestas, { nullable: true, onDelete: 'SET NULL' })
   estudiante: Estudiante | null;
 
-  @ManyToOne(() => Docente, (docente) => docente.foroRespuestas, { nullable: true })
+  @ManyToOne(() => Docente, (docente) => docente.foroRespuestas, { nullable: true, onDelete: 'SET NULL' })
   docente: Docente | null;
 }

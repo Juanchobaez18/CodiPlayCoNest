@@ -315,6 +315,11 @@ export class DocentePanelService {
 
   async getTareas(docenteId: number, cursoId?: number) {
     await this.assertDocente(docenteId);
+
+    // Ensure every course owned by this docente has at least one task,
+    // and every enrolled student has a delivery record.
+    await this.ensureTareasParaCursos(docenteId, cursoId);
+
     const where: Record<string, unknown> = { docente: { id: docenteId } };
     if (cursoId) {
       where.curso = { id: cursoId };
@@ -325,17 +330,15 @@ export class DocentePanelService {
       await this.generarTareasIniciales(docenteId);
     }
 
-    const tareas = await this.tareaRepository.find({
-      where,
-      relations: [
-        'curso',
-        'modulo',
-        'leccion',
-        'entregas',
-        'entregas.estudiante',
-        'entregas.estudiante.user',
-      ],
-      order: { fechaVencimiento: 'DESC' },
+  private async ensureTareasParaCursos(docenteId: number, cursoId?: number) {
+    const docente = await this.assertDocente(docenteId);
+
+    const cursosWhere: Record<string, unknown> = { docente: { id: docenteId } };
+    if (cursoId) cursosWhere.id = cursoId;
+
+    const cursos = await this.cursoRepository.find({
+      where: cursosWhere,
+      relations: ['estudiantes', 'modulos', 'modulos.lecciones'],
     });
 
     const tareasResponse = tareas.map((tarea) => ({
@@ -463,10 +466,17 @@ export class DocentePanelService {
   }
 
   async calificarTarea(docenteId: number, dto: CalificarTareaDto) {
-    await this.assertDocente(docenteId);
+    const docente = await this.assertDocente(docenteId);
     const entrega = await this.entregaRepository.findOne({
       where: { id: dto.entregaId },
-      relations: ['tarea', 'tarea.docente', 'estudiante'],
+      relations: [
+        'tarea',
+        'tarea.docente',
+        'tarea.leccion',
+        'tarea.modulo',
+        'estudiante',
+        'estudiante.user',
+      ],
     });
 
     if (!entrega) {
@@ -497,6 +507,50 @@ export class DocentePanelService {
     if (pendientes === 0) {
       entrega.tarea.estado = EstadoTareaEntidad.CALIFICADA;
       await this.tareaRepository.save(entrega.tarea);
+    }
+
+    // When NOT approved: send a message to the student to repeat the lesson
+    if (dto.resultado === 'NO_APROBADO') {
+      const leccionTitulo = entrega.tarea.leccion?.titulo ?? 'la lección asignada';
+      const mensaje = this.mensajeRepository.create({
+        contenido: `Tu trabajo en "${leccionTitulo}" ha sido revisado. Debes repetir esta lección para poder continuar. Revisa los materiales y vuelve a intentarlo.`,
+        remitenteTipo: RemitenteTipo.DOCENTE,
+        docente,
+        estudiante: entrega.estudiante,
+        estado: MensajeEstado.ENVIADO,
+      });
+      await this.mensajeRepository.save(mensaje);
+    }
+
+    // When approved: mark the lesson as completed in the student's progress
+    if (dto.resultado === 'APROBADO' && entrega.tarea.leccion) {
+      const estudianteConProgreso = await this.estudianteRepository.findOne({
+        where: { id: entrega.estudiante.id },
+        relations: ['leccionesCompletadas', 'cursos', 'cursos.modulos', 'cursos.modulos.lecciones'],
+      });
+      if (estudianteConProgreso) {
+        const completadas = estudianteConProgreso.leccionesCompletadas ?? [];
+        const yaCompletada = completadas.find(
+          (l) => l.id === entrega.tarea.leccion!.id,
+        );
+        if (!yaCompletada) {
+          completadas.push(entrega.tarea.leccion);
+          estudianteConProgreso.leccionesCompletadas = completadas;
+        }
+        let totalLecciones = 0;
+        for (const c of estudianteConProgreso.cursos ?? []) {
+          for (const m of c.modulos ?? []) {
+            totalLecciones += m.lecciones?.length ?? 0;
+          }
+        }
+        if (totalLecciones > 0) {
+          estudianteConProgreso.progreso = Math.min(
+            100,
+            Math.round((estudianteConProgreso.leccionesCompletadas.length / totalLecciones) * 100),
+          );
+        }
+        await this.estudianteRepository.save(estudianteConProgreso);
+      }
     }
 
     return {
@@ -683,15 +737,18 @@ export class DocentePanelService {
 
     const respuestas = await this.foroRespuestaRepository.find({
       where: { foro: { id: foroId } },
-      relations: ['estudiante', 'estudiante.user'],
-      order: { fecha_creacion: 'DESC' },
+      relations: ['estudiante', 'estudiante.user', 'docente', 'docente.user'],
+      order: { fecha_creacion: 'ASC' },
     });
 
     return respuestas.map((r) => ({
       id: r.id,
       mensaje: r.contenido,
-      estudianteNombre: r.estudiante?.user?.name ?? 'Anónimo',
-      estudianteApellido: r.estudiante?.user?.lastName ?? '',
+      estudianteNombre: r.docente ? (r.docente.user?.name ?? 'Docente') : (r.estudiante?.user?.name ?? 'Anónimo'),
+      estudianteApellido: r.docente ? (r.docente.user?.lastName ?? '') : (r.estudiante?.user?.lastName ?? ''),
+      esDocente: !!r.docente,
+      docenteId: r.docente?.id,
+      estudianteId: r.estudiante?.id,
       fechaCreacion: r.fecha_creacion?.toISOString() ?? new Date().toISOString(),
     }));
   }
@@ -741,43 +798,6 @@ export class DocentePanelService {
     };
   }
 
-  private async generarTareasIniciales(docenteId: number) {
-    const cursos = await this.cursoRepository.find({
-      where: { docente: { id: docenteId } },
-      relations: [
-        'estudiantes',
-        'modulos',
-        'modulos.lecciones',
-        'docente',
-      ],
-    });
-
-    const docente = await this.assertDocente(docenteId);
-
-    for (const curso of cursos) {
-      const modulo = [...(curso.modulos ?? [])].sort(
-        (a, b) => a.orden - b.orden,
-      )[0];
-      const leccion = modulo?.lecciones?.[0];
-      if (!modulo) continue;
-
-      const tarea = this.tareaRepository.create({
-        titulo: `Actividad: ${modulo.titulo}`,
-        descripcion: leccion
-          ? `Completar la lección "${leccion.titulo}" del módulo ${modulo.titulo}.`
-          : `Actividad del módulo ${modulo.titulo} en ${curso.nombre}.`,
-        fechaVencimiento: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-        estado: EstadoTareaEntidad.PENDIENTE,
-        docente,
-        curso,
-        modulo,
-        leccion: leccion ?? null,
-      });
-      const guardada = await this.tareaRepository.save(tarea);
-      await this.syncEntregasTarea(guardada, curso.estudiantes ?? []);
-    }
-  }
-
   /** Sincroniza entregas de tareas para estudiantes inscritos (idempotente). */
   private async syncEntregasTarea(tarea: Tarea, estudiantes: Estudiante[]) {
     for (const estudiante of estudiantes) {
@@ -785,19 +805,16 @@ export class DocentePanelService {
         where: { tarea: { id: tarea.id }, estudiante: { id: estudiante.id } },
       });
       if (!existe) {
-        const entrega = this.entregaRepository.create({
-          tarea,
-          estudiante,
-          estado:
-            Math.random() > 0.35
-              ? EstadoEntregaTarea.ENTREGADO
-              : EstadoEntregaTarea.NO_ENTREGADO,
-          calificacion: null,
-          resultado: null,
-          fechaEntrega:
-            Math.random() > 0.35 ? new Date() : null,
-        });
-        await this.entregaRepository.save(entrega);
+        await this.entregaRepository.save(
+          this.entregaRepository.create({
+            tarea,
+            estudiante,
+            estado: EstadoEntregaTarea.NO_ENTREGADO,
+            calificacion: null,
+            resultado: null,
+            fechaEntrega: null,
+          }),
+        );
       }
     }
   }
@@ -822,12 +839,15 @@ export class DocentePanelService {
       estado,
       modulo: tarea.modulo?.titulo,
       leccion: tarea.leccion?.titulo,
+      cursoId: tarea.curso?.id,
+      cursoNombre: tarea.curso?.nombre,
       entregas: (tarea.entregas ?? []).map((e) => ({
         id: e.id,
         estudianteNombre: e.estudiante?.user?.name ?? 'Estudiante',
         estudianteApellido: e.estudiante?.user?.lastName ?? '',
         estado: e.estado,
         calificacion: e.calificacion,
+        resultado: e.resultado,
       })),
     };
   }

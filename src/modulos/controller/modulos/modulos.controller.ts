@@ -24,6 +24,11 @@ export class ModulosController {
     return this.modulosService.findAll();
   }
 
+  @Get('by-curso/:cursoId')
+  findByCurso(@Param('cursoId') cursoId: string) {
+    return this.modulosService.findByCurso(+cursoId);
+  }
+
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.modulosService.findOne(+id);

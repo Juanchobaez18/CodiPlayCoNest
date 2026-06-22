@@ -26,7 +26,7 @@ export class CursoService {
 
   findAll() {
     return this.cursoRepository.find({
-      relations: ['docente', 'docente.user'],
+      relations: ['docente', 'docente.user', 'estudiantes'],
     });
   }
 

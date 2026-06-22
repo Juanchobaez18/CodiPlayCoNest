@@ -46,7 +46,7 @@ export class ModulosService {
   async findOne(id: number) {
     const modulo = await this.moduloRepo.findOne({
       where: { id },
-      relations: ['curso'],
+      relations: ['curso', 'lecciones'],
     });
 
     if (!modulo) {
@@ -54,6 +54,15 @@ export class ModulosService {
     }
 
     return modulo;
+  }
+
+  // 🔍 GET BY CURSO
+  async findByCurso(cursoId: number) {
+    return this.moduloRepo.find({
+      where: { curso: { id: cursoId } },
+      relations: ['lecciones'],
+      order: { orden: 'ASC' },
+    });
   }
 
   // ✏️ UPDATE

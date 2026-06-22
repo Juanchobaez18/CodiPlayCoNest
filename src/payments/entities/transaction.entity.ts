@@ -26,8 +26,8 @@ export class Transaction {
   @Column({ type: 'int' })
   estudianteId!: number;
 
-@ManyToOne(() => Estudiante, (estudiante) => estudiante.transactions)
-estudiante: Estudiante;
+@ManyToOne(() => Estudiante, (estudiante) => estudiante.transactions, { nullable: true, onDelete: 'SET NULL' })
+estudiante: Estudiante | null;
 
   @Column({ type: 'int' })
   cursoId!: number;

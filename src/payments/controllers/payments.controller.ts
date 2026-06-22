@@ -65,6 +65,31 @@ export class PaymentsController {
     );
   }
 
+  @Post('stripe/create-session')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({ summary: 'Crear sesión de Stripe Checkout y devolver URL de pago' })
+  async createCheckoutSession(
+    @Body() createPaymentDto: CreatePaymentDto,
+    @Request() req,
+  ) {
+    const userId = req.user.id;
+    return await this.paymentsService.createStripeCheckoutSession(
+      userId,
+      createPaymentDto,
+    );
+  }
+
+  @Get('confirm-enrollment')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Confirmar inscripción al curso tras pago exitoso de Stripe' })
+  async confirmEnrollment(
+    @Request() req,
+    @Query('transaccionId', ParseIntPipe) transaccionId: number,
+  ) {
+    return await this.paymentsService.confirmEnrollment(req.user.id, transaccionId);
+  }
+
   @Post('stripe/webhook')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Procesar webhook de Stripe' })

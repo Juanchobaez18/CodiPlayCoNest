@@ -35,14 +35,28 @@ export class AdminService {
   ) {}
 
   async getDashboardStats() {
-    const estudiantes = await this.estudiantesService.findAll();
-    const cursos = await this.cursoService.findAll();
-    const docentes = await this.docenteService.findAll();
+    const [estudiantes, cursos, docentes] = await Promise.all([
+      this.estudiantesService.findAll(),
+      this.cursoService.findAll(),
+      this.docenteService.findAll(),
+    ]);
+
+    const totalEstudiantes = estudiantes.length;
+    const totalEstudiantesActivos = estudiantes.filter(
+      (e) => e.user?.isActive,
+    ).length;
+
+    const tasaExito =
+      totalEstudiantes > 0
+        ? Math.round((totalEstudiantesActivos / totalEstudiantes) * 100)
+        : 0;
 
     return {
-      totalEstudiantes: estudiantes.length,
+      totalEstudiantes,
+      totalEstudiantesActivos,
       totalCursosActivos: cursos.filter((c) => c.estado).length,
       totalDocentesActivos: docentes.filter((d) => d.user?.isActive).length,
+      tasaExito,
     };
   }
 
@@ -96,6 +110,19 @@ export class AdminService {
         'No se puede eliminar un usuario administrador desde este panel.',
       );
     }
+
+    // Clear ManyToMany junction table (user_roles) before raw delete
+    user.roles = [];
+    await this.userRepo.save(user);
+
+    // Remove linked profiles so their FK to user.id doesn't block the delete
+    if (user.estudiante) {
+      await this.estudiantesService.remove(user.estudiante.id);
+    }
+    if (user.docente) {
+      await this.docenteService.remove(user.docente.id);
+    }
+
     await this.usersService.deleteUser(id);
     return { ok: true };
   }

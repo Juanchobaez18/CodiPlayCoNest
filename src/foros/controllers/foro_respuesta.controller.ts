@@ -2,6 +2,8 @@ import {
   Controller,
   Post,
   Get,
+  Put,
+  Delete,
   Param,
   Body,
   ParseIntPipe,
@@ -34,10 +36,19 @@ export class ForoRespuestaController {
 
   @Post(':foroId/respuestas')
   crear(
+    @Request() req: any,
     @Param('foroId', ParseIntPipe) foroId: number,
     @Body() dto: CrearForoRespuestaDto,
   ) {
     dto.foroId = foroId;
+    const user = req.user;
+    if (user) {
+      if (user.docente?.id && !dto.docenteId) {
+        dto.docenteId = user.docente.id;
+      } else if (user.estudiante?.id && !dto.estudianteId) {
+        dto.estudianteId = user.estudiante.id;
+      }
+    }
     return this.foroRespuestaService.crear(dto);
   }
 
@@ -51,5 +62,18 @@ export class ForoRespuestaController {
       return this.docentePanelService.getForoRespuestas(docenteId, foroId);
     }
     return this.foroRespuestaService.obtenerPorForo(foroId);
+  }
+
+  @Put('respuestas/:id')
+  actualizar(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: { contenido: string },
+  ) {
+    return this.foroRespuestaService.actualizar(id, dto.contenido);
+  }
+
+  @Delete('respuestas/:id')
+  eliminar(@Param('id', ParseIntPipe) id: number) {
+    return this.foroRespuestaService.eliminar(id);
   }
 }

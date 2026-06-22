@@ -1,10 +1,11 @@
-import { Entity, PrimaryGeneratedColumn, Column, OneToOne, JoinColumn, ManyToMany, OneToMany } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, OneToOne, JoinColumn, ManyToMany, OneToMany, JoinTable } from 'typeorm';
 import { User } from '../../users/entities/user.entity';
 import { Curso } from 'src/curso/entity/curso.entity/curso.entity';
 import { Transaction } from 'src/payments/entities/transaction.entity';
 import { Forum } from '../../foros/entities/forum.entity';
 import { Mensaje } from '../../mensajes/entities/mensaje.entity';
 import { ForoRespuesta } from '../../foros/entities/foro_respuesta.entity';
+import { Lecciones } from '../../lecciones/entities/lecciones.entity';
 
 @Entity()
 export class Estudiante {
@@ -42,4 +43,8 @@ progreso: number;
 
   @OneToMany(() => ForoRespuesta, (respuesta) => respuesta.estudiante)
   foroRespuestas: ForoRespuesta[];
+
+  @ManyToMany(() => Lecciones)
+  @JoinTable()
+  leccionesCompletadas: Lecciones[];
 }

@@ -30,11 +30,11 @@ export class Mensaje {
   })
   remitenteTipo: RemitenteTipo;
 
-  @ManyToOne(() => Estudiante, (estudiante) => estudiante.mensajes)
-  estudiante: Estudiante;
+  @ManyToOne(() => Estudiante, (estudiante) => estudiante.mensajes, { nullable: true, onDelete: 'SET NULL' })
+  estudiante: Estudiante | null;
 
-  @ManyToOne(() => Docente, (docente) => docente.mensajes)
-  docente: Docente;
+  @ManyToOne(() => Docente, (docente) => docente.mensajes, { nullable: true, onDelete: 'SET NULL' })
+  docente: Docente | null;
 
   
 }

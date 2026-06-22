@@ -48,8 +48,22 @@ export class ForoRespuestaService {
   async obtenerPorForo(foroId: number): Promise<ForoRespuesta[]> {
     return this.foroRespuestaRepo.find({
       where: { foro: { id: foroId } },
-      relations: ['estudiante', 'docente'],
+      relations: ['estudiante', 'estudiante.user', 'docente', 'docente.user'],
       order: { fecha_creacion: 'ASC' },
     });
+  }
+
+  async actualizar(id: number, contenido: string): Promise<ForoRespuesta> {
+    const respuesta = await this.foroRespuestaRepo.findOne({ where: { id } });
+    if (!respuesta) throw new NotFoundException(`Respuesta con id ${id} no encontrada`);
+    respuesta.contenido = contenido;
+    return this.foroRespuestaRepo.save(respuesta);
+  }
+
+  async eliminar(id: number): Promise<{ success: boolean; message: string }> {
+    const respuesta = await this.foroRespuestaRepo.findOne({ where: { id } });
+    if (!respuesta) throw new NotFoundException(`Respuesta con id ${id} no encontrada`);
+    await this.foroRespuestaRepo.remove(respuesta);
+    return { success: true, message: 'Respuesta eliminada exitosamente' };
   }
 }
