@@ -36,6 +36,8 @@ export class UsersService {
                 roles: {
                     modules: true,
                 },
+                docente: true,
+                estudiante: true,
             },
             // relations: ['roles'], //clave
         });
@@ -49,7 +51,13 @@ export class UsersService {
     async findOne(userId: number) {
         const user = await this.userRepo.findOne({
             where: { id: userId },
-            relations: ['roles']
+            relations: {
+                roles: {
+                    modules: true,
+                },
+                docente: true,
+                estudiante: true,
+            },
         });
         if (!user) {
             throw new NotFoundException(`User #${userId} not found`);
@@ -118,6 +126,13 @@ export class UsersService {
     //     }
     //     this.userRepo.merge(user, payloadUpdated);
     // }
+
+    async updateAvatar(id: number, avatarPath: string) {
+        const user = await this.userRepo.findOne({ where: { id } });
+        if (!user) throw new NotFoundException(`User #${id} not found`);
+        user.avatar = avatarPath;
+        return this.userRepo.save(user);
+    }
 
     deleteUser(idUser: number) {
         return this.userRepo.delete(idUser);

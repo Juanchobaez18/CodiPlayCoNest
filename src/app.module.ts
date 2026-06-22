@@ -13,12 +13,21 @@ import { AuthModule } from './auth/auth.module';
 import { ModulesModule } from './modules/modules.module';
 import { DocenteModule } from './docente/docente.module';
 import { EstudiantesModule } from './estudiantes/estudiantes.module';
+import { CursoModule } from './curso/curso.module';
+import { ModulosModule } from './modulos/modulos.module';
+import { MensajesModule } from './mensajes/mensajes.module';
 import config from './config';
+import { PaymentsModule } from './payments/payments.module';
+import { ForosModule } from './foros/foros.module';
+import { ContactModule } from './contact/contact.module';
+import { AdminModule } from './admin/admin.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
-      envFilePath: enviroments[process.env.NODE_ENV || '.env'],
+      envFilePath:
+        enviroments[process.env.NODE_ENV as keyof typeof enviroments] ||
+        enviroments.dev,
       load: [config],
       isGlobal: true,
       validationSchema: Joi.object({
@@ -29,6 +38,15 @@ import config from './config';
         POSTGRES_HOST: Joi.string().required(),
         JWT_SECRET: Joi.string().required(),
         JWT_EXPIRES_IN: Joi.number().required(),
+        MAIL_HOST: Joi.string().required(),
+        MAIL_PORT: Joi.number().required(),
+        MAIL_USER: Joi.string().required(),
+        MAIL_PASS: Joi.string().required(),
+        MAIL_FROM: Joi.string().required(),
+        MAIL_TO: Joi.string().required(),
+        STRIPE_PUBLISHABLE_KEY: Joi.string().required(),
+        STRIPE_SECRET_KEY: Joi.string().required(),
+        STRIPE_WEBHOOK_SECRET: Joi.string().required(),
       }),
     }),
     DatabaseModule,
@@ -36,9 +54,16 @@ import config from './config';
     UsersModule,
     RolesModule,
     PermissionsModule,
+    PaymentsModule,
     ModulesModule,
     DocenteModule,
     EstudiantesModule,
+    CursoModule,
+    ModulosModule,
+    ForosModule,
+    MensajesModule,
+    ContactModule,
+    AdminModule,
   ],
   controllers: [AppController],
   providers: [AppService],

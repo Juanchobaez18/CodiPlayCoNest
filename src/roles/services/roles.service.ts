@@ -1,7 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Role } from '../entities/role.entity';
-import { In, Repository } from 'typeorm';
+import { ILike, In, Repository } from 'typeorm';
 import { CreateRoleDto, UpdateRoleDto } from '../dtos/role.dto';
 import { ModulesService } from '../../modules/modules.service';
 
@@ -52,6 +52,25 @@ export class RolesService {
             where: { id: In(roleIds) },
         });
         return roles;
+    }
+
+    async findByName(name: string) {
+        return this.roleRepo.findOne({
+            where: { name: ILike(name) },
+            relations: ['modules'],
+        });
+    }
+
+    async findStudentRole() {
+        const candidates = ['Estudiante', 'Student', 'Alumno', 'alumno', 'ESTUDIANTE'];
+        for (const name of candidates) {
+            const role = await this.roleRepo.findOne({
+                where: { name: ILike(name) },
+                relations: ['modules'],
+            });
+            if (role) return role;
+        }
+        return null;
     }
 
 
