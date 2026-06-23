@@ -8,6 +8,11 @@ import {
   LeccionProgreso,
   EstadoLeccionProgreso,
 } from '../../../docente/entities/leccion-progreso.entity';
+import {
+  TareaEntrega,
+  EstadoEntregaTarea,
+  ResultadoCalificacion,
+} from '../../../docente/entities/tarea-entrega.entity';
 import { Lecciones } from '../../../lecciones/entities/lecciones.entity';
 
 @Injectable()
@@ -17,6 +22,7 @@ export class EstudiantesService {
         @InjectRepository(Estudiante) private estudianteRepo: Repository<Estudiante>,
         @InjectRepository(LeccionProgreso) private leccionProgresoRepo: Repository<LeccionProgreso>,
         @InjectRepository(Lecciones) private leccionesRepo: Repository<Lecciones>,
+        @InjectRepository(TareaEntrega) private entregaRepo: Repository<TareaEntrega>,
         private usersService: UsersService,
     ) {}
 

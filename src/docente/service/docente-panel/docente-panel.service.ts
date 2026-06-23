@@ -325,12 +325,25 @@ export class DocentePanelService {
       where.curso = { id: cursoId };
     }
 
-    const count = await this.tareaRepository.count({ where });
-    if (count === 0) {
-      await this.generarTareasIniciales(docenteId);
-    }
+    const tareas = await this.tareaRepository.find({
+      where,
+      relations: [
+        'curso',
+        'modulo',
+        'leccion',
+        'entregas',
+        'entregas.estudiante',
+        'entregas.estudiante.user',
+      ],
+    });
 
-  private async ensureTareasParaCursos(docenteId: number, cursoId?: number) {
+    return tareas.map((tarea) => ({
+      tipo: 'tarea' as const,
+      ...this.mapTareaResponse(tarea),
+    }));
+  }
+
+  private async ensureTareasParaCursos(docenteId: number, cursoId?: number): Promise<void> {
     const docente = await this.assertDocente(docenteId);
 
     const cursosWhere: Record<string, unknown> = { docente: { id: docenteId } };
@@ -341,14 +354,38 @@ export class DocentePanelService {
       relations: ['estudiantes', 'modulos', 'modulos.lecciones'],
     });
 
-    const tareasResponse = tareas.map((tarea) => ({
-      tipo: 'tarea' as const,
-      ...this.mapTareaResponse(tarea),
-    }));
+    for (const curso of cursos) {
+      const tareas = await this.tareaRepository.find({
+        where: {
+          docente: { id: docenteId },
+          curso: { id: curso.id },
+        },
+        relations: ['entregas', 'entregas.estudiante'],
+      });
 
-    const solicitudesLeccion = await this.getLeccionesPendientesParaDocente(docenteId, cursoId);
+      if (tareas.length === 0) {
+        const primeraModulo = curso.modulos?.[0] ?? null;
+        const primeraLeccion = primeraModulo?.lecciones?.[0] ?? null;
 
-    return [...tareasResponse, ...solicitudesLeccion];
+        const nuevaTarea = this.tareaRepository.create({
+          titulo: `Tarea inicial para ${curso.nombre}`,
+          descripcion: `Tarea generada automáticamente para el curso "${curso.nombre}".`,
+          fechaVencimiento: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+          docente,
+          curso,
+          modulo: primeraModulo,
+          leccion: primeraLeccion,
+        });
+
+        const tareaGuardada = await this.tareaRepository.save(nuevaTarea);
+        await this.syncEntregasTarea(tareaGuardada, curso.estudiantes ?? []);
+        continue;
+      }
+
+      for (const tarea of tareas) {
+        await this.syncEntregasTarea(tarea, curso.estudiantes ?? []);
+      }
+    }
   }
 
   private async getLeccionesPendientesParaDocente(docenteId: number, cursoId?: number) {

@@ -4,6 +4,7 @@ import { EstudiantesController } from './controller/estudiantes/estudiantes.cont
 import { Estudiante } from './entities/estudiantes.entity';
 import { Mensaje } from '../mensajes/entities/mensaje.entity';
 import { LeccionProgreso } from '../docente/entities/leccion-progreso.entity';
+import { TareaEntrega } from '../docente/entities/tarea-entrega.entity';
 import { Lecciones } from '../lecciones/entities/lecciones.entity';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { UsersModule } from '../users/users.module';
@@ -12,7 +13,7 @@ import { UsersModule } from '../users/users.module';
   providers: [EstudiantesService],
   controllers: [EstudiantesController],
   imports: [
-    TypeOrmModule.forFeature([Estudiante, Mensaje, LeccionProgreso, Lecciones]),
+    TypeOrmModule.forFeature([Estudiante, Mensaje, LeccionProgreso, TareaEntrega, Lecciones]),
     UsersModule,
   ],
   exports: [EstudiantesService],
