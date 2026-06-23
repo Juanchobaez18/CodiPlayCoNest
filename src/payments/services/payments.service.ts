@@ -79,11 +79,15 @@ export class PaymentsService {
   ): Promise<{ transaction: Transaction; clientSecret: string }> {
     const estudiante = await this.findEstudianteByUserId(userId);
 
+    const currency = (
+      this.configService.get<string>('config.stripe.currency') || 'usd'
+    ).toLowerCase();
+
     const transaction = this.transactionRepository.create({
       estudianteId: estudiante.id,
       cursoId: createPaymentDto.courseId,
       amount: createPaymentDto.amount,
-      currency: this.configService.get<string>('stripe.currency') || 'usd',
+      currency,
       status: TransactionStatus.PENDING,
     });
 
@@ -91,9 +95,8 @@ export class PaymentsService {
 
     const paymentIntent = await this.stripe.paymentIntents.create({
       amount: Math.round(createPaymentDto.amount * 100),
-      currency: (
-        this.configService.get<string>('config.stripe.currency') || 'usd'
-      ).toLowerCase(),
+      currency,
+
       metadata: {
         transactionId: savedTransaction.id.toString(),
         estudianteId: estudiante.id.toString(),
@@ -268,17 +271,25 @@ export class PaymentsService {
       transaction.stripePaymentIntentId
     ) {
       try {
-        const session = await this.stripe.checkout.sessions.retrieve(
-          transaction.stripePaymentIntentId,
-        );
-        if (session.payment_status === 'paid') {
+        const stripeId = transaction.stripePaymentIntentId;
+        let sessionPaid = false;
+
+        if (stripeId.startsWith('cs_')) {
+          const session = await this.stripe.checkout.sessions.retrieve(stripeId);
+          sessionPaid = session.payment_status === 'paid';
+        } else if (stripeId.startsWith('pi_')) {
+          const paymentIntent = await this.stripe.paymentIntents.retrieve(stripeId);
+          sessionPaid = paymentIntent.status === 'succeeded';
+        }
+
+        if (sessionPaid) {
           transaction.status = TransactionStatus.COMPLETED;
           await this.transactionRepository.save(transaction);
           await this.ensureEnrollment(estudiante.id, transaction.cursoId);
           return { inscrito: true, cursoId: transaction.cursoId };
         }
       } catch (_) {
-        // Stripe API unavailable — fall through
+        // Stripe API unavailable or ID invalid — fall through
       }
     }
 

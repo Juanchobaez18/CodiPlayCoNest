@@ -11,7 +11,7 @@ async function bootstrap() {
   app.useStaticAssets(join(__dirname, '..', 'public'));
   app.useStaticAssets(join(__dirname, '..', 'uploads'), { prefix: '/uploads' });
   app.enableCors();
-  app.use('/payments/webhook', express.raw({ type: 'application/json' }));
+  app.use('/payments/stripe/webhook', express.raw({ type: 'application/json' }));
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
   const config = new DocumentBuilder()
     .setTitle('API')
