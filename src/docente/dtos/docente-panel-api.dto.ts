@@ -4,6 +4,7 @@ import {
   IsString,
   IsOptional,
   IsEnum,
+  IsDateString,
   Min,
   MaxLength,
   MinLength,
@@ -117,4 +118,16 @@ export class FiltroMensajesQueryDto {
   @IsOptional()
   @IsNumber()
   limit?: number;
+}
+
+export class UpdateFechaVencimientoDto {
+  @ApiProperty()
+  @IsNumber()
+  @Min(1)
+  tareaId: number;
+
+  @ApiProperty({ description: 'ISO 8601 date string' })
+  @IsDateString()
+  @IsNotEmpty()
+  fechaVencimiento: string;
 }

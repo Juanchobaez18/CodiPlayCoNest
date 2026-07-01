@@ -26,6 +26,7 @@ import {
   CalificarTareaDto,
   CreateForoPanelDto,
   UpdateForoPanelDto,
+  UpdateFechaVencimientoDto,
 } from '../../dtos/docente-panel-api.dto';
 import { RequiereAccesoDocente } from '../../decorators/acceso-funcional.decorator';
 
@@ -90,6 +91,17 @@ export class DocentePanelController {
     );
   }
 
+  @Get('estudiantes/:id/progreso')
+  getEstudianteProgreso(
+    @Request() req: { docenteId?: number; user?: { docente?: { id?: number } } },
+    @Param('id', ParseIntPipe) estudianteId: number,
+  ) {
+    return this.docentePanelService.getEstudianteProgreso(
+      this.resolveDocenteId(req),
+      estudianteId,
+    );
+  }
+
   @Get('tareas')
   getTareas(
     @Request() req: { docenteId?: number; user?: { docente?: { id?: number } } },
@@ -107,6 +119,17 @@ export class DocentePanelController {
     @Body() dto: CalificarTareaDto,
   ) {
     return this.docentePanelService.calificarTarea(
+      this.resolveDocenteId(req),
+      dto,
+    );
+  }
+
+  @Put('tareas/fecha-vencimiento')
+  updateFechaVencimiento(
+    @Request() req: { docenteId?: number; user?: { docente?: { id?: number } } },
+    @Body() dto: UpdateFechaVencimientoDto,
+  ) {
+    return this.docentePanelService.updateFechaVencimiento(
       this.resolveDocenteId(req),
       dto,
     );
