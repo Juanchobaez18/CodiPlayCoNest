@@ -17,8 +17,9 @@ import config from '../config';
                     username: user,
                     password,
                     database: name,
-                    synchronize: true,
+                    synchronize: false,
                     autoLoadEntities: true,
+                    ssl: process.env.NODE_ENV === 'prod' ? { rejectUnauthorized: false } : false,
                 };
             },
         }),

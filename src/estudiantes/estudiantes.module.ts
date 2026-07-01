@@ -3,6 +3,7 @@ import { EstudiantesService } from './service/estudiantes/estudiantes.service';
 import { EstudiantesController } from './controller/estudiantes/estudiantes.controller';
 import { Estudiante } from './entities/estudiantes.entity';
 import { Mensaje } from '../mensajes/entities/mensaje.entity';
+import { LeccionProgreso } from '../docente/entities/leccion-progreso.entity';
 import { TareaEntrega } from '../docente/entities/tarea-entrega.entity';
 import { Tarea } from '../docente/entities/tarea.entity';
 import { Docente } from '../docente/entities/docente.entity';

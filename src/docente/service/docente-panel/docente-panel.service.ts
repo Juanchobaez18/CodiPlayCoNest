@@ -20,6 +20,10 @@ import {
   TareaEntrega,
   EstadoEntregaTarea,
 } from '../../entities/tarea-entrega.entity';
+import {
+  LeccionProgreso,
+  EstadoLeccionProgreso,
+} from '../../entities/leccion-progreso.entity';
 import { User } from 'src/users/entities/user.entity';
 import {
   RemitenteTipo,
@@ -497,7 +501,7 @@ export class DocentePanelService {
     return filteredTareas.map((tarea) => this.mapTareaResponse(tarea));
   }
 
-  private async ensureTareasParaCursos(docenteId: number, cursoId?: number) {
+  private async ensureTareasParaCursos(docenteId: number, cursoId?: number): Promise<void> {
     const docente = await this.assertDocente(docenteId);
 
     const cursosWhere: Record<string, unknown> = { docente: { id: docenteId } };
@@ -584,6 +588,120 @@ export class DocentePanelService {
     tarea.fechaVencimiento = new Date(dto.fechaVencimiento);
     await this.tareaRepository.save(tarea);
     return { success: true, tareaId: tarea.id, fechaVencimiento: tarea.fechaVencimiento.toISOString() };
+  }
+
+  private async getLeccionesPendientesParaDocente(docenteId: number, cursoId?: number) {
+    const qb = this.leccionProgresoRepository
+      .createQueryBuilder('lp')
+      .innerJoinAndSelect('lp.leccion', 'leccion')
+      .innerJoinAndSelect('leccion.modulo', 'modulo')
+      .innerJoinAndSelect('modulo.curso', 'curso')
+      .innerJoinAndSelect('curso.docente', 'docente')
+      .innerJoinAndSelect('lp.estudiante', 'estudiante')
+      .innerJoinAndSelect('estudiante.user', 'user')
+      .where('docente.id = :docenteId', { docenteId })
+      .orderBy('lp.fechaSolicitud', 'DESC');
+
+    if (cursoId) {
+      qb.andWhere('curso.id = :cursoId', { cursoId });
+    }
+
+    const registros = await qb.getMany();
+
+    return registros.map((lp) => ({
+      tipo: 'leccion_completada' as const,
+      id: lp.id,
+      titulo: `Lección completada: ${lp.leccion?.titulo ?? ''}`,
+      descripcion: `${lp.estudiante?.user?.name ?? ''} ${lp.estudiante?.user?.lastName ?? ''} completó la lección "${lp.leccion?.titulo ?? ''}" del módulo "${lp.leccion?.modulo?.titulo ?? ''}"`,
+      estado: lp.estado,
+      leccionNombre: lp.leccion?.titulo,
+      moduloNombre: lp.leccion?.modulo?.titulo,
+      cursoNombre: lp.leccion?.modulo?.curso?.nombre,
+      cursoId: lp.leccion?.modulo?.curso?.id,
+      estudianteId: lp.estudiante?.id,
+      estudianteNombre: lp.estudiante?.user?.name ?? 'Estudiante',
+      estudianteApellido: lp.estudiante?.user?.lastName ?? '',
+      fechaSolicitud: lp.fechaSolicitud?.toISOString(),
+      fechaRevision: lp.fechaRevision?.toISOString() ?? null,
+      comentario: lp.comentario,
+      progresoId: lp.id,
+    }));
+  }
+
+  async revisarLeccionProgreso(docenteId: number, dto: RevisarLeccionProgresoDto) {
+    await this.assertDocente(docenteId);
+
+    const registro = await this.leccionProgresoRepository.findOne({
+      where: { id: dto.progresoId },
+      relations: [
+        'leccion',
+        'leccion.modulo',
+        'leccion.modulo.curso',
+        'leccion.modulo.curso.docente',
+        'estudiante',
+        'estudiante.user',
+        'estudiante.cursos',
+        'estudiante.cursos.modulos',
+        'estudiante.cursos.modulos.lecciones',
+      ],
+    });
+
+    if (!registro) {
+      throw new NotFoundException('Registro de progreso de lección no encontrado');
+    }
+    if (registro.leccion?.modulo?.curso?.docente?.id !== docenteId) {
+      throw new ForbiddenException('No tiene acceso a esta lección');
+    }
+
+    registro.estado =
+      dto.resultado === 'aprobado'
+        ? EstadoLeccionProgreso.APROBADO
+        : EstadoLeccionProgreso.RECHAZADO;
+    registro.comentario = dto.comentario ?? null;
+    registro.fechaRevision = new Date();
+
+    await this.leccionProgresoRepository.save(registro);
+
+    if (dto.resultado === 'aprobado') {
+      await this.recalcularProgresoEstudiante(registro.estudiante);
+    }
+
+    return {
+      success: true,
+      message:
+        dto.resultado === 'aprobado'
+          ? 'Lección aprobada. El estudiante puede avanzar a la siguiente lección.'
+          : 'Lección rechazada. El estudiante deberá repetirla.',
+      estado: registro.estado,
+      estudianteNombre: `${registro.estudiante?.user?.name ?? ''} ${registro.estudiante?.user?.lastName ?? ''}`.trim(),
+      leccionNombre: registro.leccion?.titulo,
+    };
+  }
+
+  private async recalcularProgresoEstudiante(estudiante: Estudiante) {
+    const estudianteConCursos = await this.estudianteRepository.findOne({
+      where: { id: estudiante.id },
+      relations: ['cursos', 'cursos.modulos', 'cursos.modulos.lecciones'],
+    });
+    if (!estudianteConCursos) return;
+
+    const totalLecciones = (estudianteConCursos.cursos ?? [])
+      .flatMap((c) => c.modulos ?? [])
+      .flatMap((m) => m.lecciones ?? [])
+      .length;
+
+    if (totalLecciones === 0) return;
+
+    const aprobadas = await this.leccionProgresoRepository.count({
+      where: {
+        estudiante: { id: estudiante.id },
+        estado: EstadoLeccionProgreso.APROBADO,
+      },
+    });
+
+    const nuevoProgreso = Math.min(100, Math.round((aprobadas / totalLecciones) * 100));
+    estudianteConCursos.progreso = nuevoProgreso;
+    await this.estudianteRepository.save(estudianteConCursos);
   }
 
   async calificarTarea(docenteId: number, dto: CalificarTareaDto) {

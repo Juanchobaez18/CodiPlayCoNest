@@ -2,6 +2,7 @@ import { BadRequestException, Body, Controller, Delete, Get, Param, ParseIntPipe
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiBearerAuth, ApiBody, ApiConsumes } from '@nestjs/swagger';
 import { diskStorage } from 'multer';
+import type { Express } from 'express';
 import { extname } from 'path';
 import { randomUUID } from 'crypto';
 import { Modules } from '../../../auth/decorators/modules.decorator';

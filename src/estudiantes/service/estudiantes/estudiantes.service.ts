@@ -19,6 +19,7 @@ export class EstudiantesService {
         @InjectRepository(Tarea) private tareaRepo: Repository<Tarea>,
         @InjectRepository(Docente) private docenteRepo: Repository<Docente>,
         @InjectRepository(Lecciones) private leccionesRepo: Repository<Lecciones>,
+        @InjectRepository(TareaEntrega) private entregaRepo: Repository<TareaEntrega>,
         private usersService: UsersService,
         private progressGateway: ProgressGateway,
     ) {}

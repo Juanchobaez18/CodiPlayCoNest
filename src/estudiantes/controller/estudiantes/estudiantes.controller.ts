@@ -101,4 +101,14 @@ findByUserId(@Param('userId', ParseIntPipe) userId: number) {
     remove(@Param('id', ParseIntPipe) id: number) {
         return this.estudiantesService.remove(id);
     }
+
+    @Post('mis-lecciones/:leccionId/completar')
+    @ApiOperation({ summary: 'Marcar una lección como completada (requiere aprobación del docente)' })
+    @ApiResponse({ status: 201, description: 'Lección marcada como completada, en espera de aprobación' })
+    completarLeccion(
+        @Param('leccionId', ParseIntPipe) leccionId: number,
+        @Request() req: { user?: { id?: number } },
+    ) {
+        return this.estudiantesService.completarLeccion(req.user?.id ?? 0, leccionId);
+    }
 }

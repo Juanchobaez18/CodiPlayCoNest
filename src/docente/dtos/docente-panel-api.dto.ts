@@ -33,8 +33,7 @@ export class CalificarTareaDto {
   entregaId: number;
 
   @ApiProperty({ enum: ['Aprobado', 'No aprobado'] })
-  @IsString()
-  @IsNotEmpty()
+  @IsIn(['Aprobado', 'No aprobado'])
   calificacion: string;
 
   @ApiProperty({ enum: ResultadoCalificacion })
@@ -104,6 +103,23 @@ export class FiltroEstudiantesQueryDto {
   @IsOptional()
   @IsNumber()
   limit?: number;
+}
+
+export class RevisarLeccionProgresoDto {
+  @ApiProperty({ description: 'ID del registro LeccionProgreso a revisar' })
+  @IsNumber()
+  @Min(1)
+  progresoId: number;
+
+  @ApiProperty({ enum: ['aprobado', 'rechazado'] })
+  @IsEnum(['aprobado', 'rechazado'])
+  resultado: 'aprobado' | 'rechazado';
+
+  @ApiProperty({ required: false, description: 'Comentario opcional al estudiante' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  comentario?: string;
 }
 
 export class FiltroMensajesQueryDto {

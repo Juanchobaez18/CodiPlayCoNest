@@ -14,16 +14,18 @@ import {
   UploadedFile,
   UseInterceptors,
   BadRequestException,
+  HttpCode,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
-import { ApiBearerAuth, ApiTags, ApiConsumes } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiTags, ApiConsumes, ApiBody } from '@nestjs/swagger';
 import { JwtAuthGuard } from 'src/auth/guards/auth.guard';
 import { AccesoFuncionalDocenteGuard } from '../../guards/acceso-funcional-docente.guard';
 import { DocentePanelService } from '../../service/docente-panel/docente-panel.service';
 import {
   SendMensajePanelDto,
   CalificarTareaDto,
+  RevisarLeccionProgresoDto,
   CreateForoPanelDto,
   UpdateForoPanelDto,
   UpdateFechaVencimientoDto,
@@ -176,6 +178,14 @@ export class DocentePanelController {
     return this.docentePanelService.createForo(this.resolveDocenteId(req), dto);
   }
 
+  @Get('foros/:id')
+  getForoById(
+    @Request() req: { docenteId?: number; user?: { docente?: { id?: number } } },
+    @Param('id', ParseIntPipe) foroId: number,
+  ) {
+    return this.docentePanelService.getForoById(this.resolveDocenteId(req), foroId);
+  }
+
   @Put('foros/:id')
   updateForo(
     @Request() req: { docenteId?: number; user?: { docente?: { id?: number } } },
@@ -186,19 +196,12 @@ export class DocentePanelController {
   }
 
   @Delete('foros/:id')
+  @HttpCode(200)
   deleteForo(
     @Request() req: { docenteId?: number; user?: { docente?: { id?: number } } },
     @Param('id', ParseIntPipe) foroId: number,
   ) {
     return this.docentePanelService.deleteForo(this.resolveDocenteId(req), foroId);
-  }
-
-  @Get('foros/:id')
-  getForoById(
-    @Request() req: { docenteId?: number; user?: { docente?: { id?: number } } },
-    @Param('id', ParseIntPipe) foroId: number,
-  ) {
-    return this.docentePanelService.getForoById(this.resolveDocenteId(req), foroId);
   }
 
   @Get('foros/:id/respuestas')
@@ -211,6 +214,7 @@ export class DocentePanelController {
 
   @Post('subir-foto')
   @ApiConsumes('multipart/form-data')
+  @ApiBody({ schema: { type: 'object', properties: { foto: { type: 'string', format: 'binary' } } } })
   @UseInterceptors(
     FileInterceptor('foto', {
       storage: memoryStorage(),
