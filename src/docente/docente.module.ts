@@ -20,6 +20,7 @@ import { AccesoFuncionalDocenteGuard } from './guards/acceso-funcional-docente.g
 import { PanelOModulosGuard } from './guards/panel-o-modulos.guard';
 import { ModulesGuard } from 'src/auth/guards/modules.guard.guard';
 import { UsersModule } from 'src/users/users.module';
+import { ProgressModule } from 'src/progress/progress.module';
 
 @Module({
   imports: [
@@ -38,6 +39,7 @@ import { UsersModule } from 'src/users/users.module';
       User,
     ]),
     UsersModule,
+    ProgressModule,
   ],
   controllers: [DocenteController, DocentePanelController],
   providers: [

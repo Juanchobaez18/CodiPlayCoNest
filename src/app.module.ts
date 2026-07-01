@@ -21,6 +21,7 @@ import { PaymentsModule } from './payments/payments.module';
 import { ForosModule } from './foros/foros.module';
 import { ContactModule } from './contact/contact.module';
 import { AdminModule } from './admin/admin.module';
+import { ProgressModule } from './progress/progress.module';
 
 @Module({
   imports: [
@@ -64,6 +65,7 @@ import { AdminModule } from './admin/admin.module';
     MensajesModule,
     ContactModule,
     AdminModule,
+    ProgressModule,
   ],
   controllers: [AppController],
   providers: [AppService],

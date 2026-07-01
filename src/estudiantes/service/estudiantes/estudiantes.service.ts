@@ -4,26 +4,24 @@ import { Repository } from 'typeorm';
 import { Estudiante } from '../../entities/estudiantes.entity';
 import { CreateEstudianteDto, UpdateEstudianteDto } from '../../dtos/estudiante.dto';
 import { UsersService } from '../../../users/services/users/users.service';
-import {
-  LeccionProgreso,
-  EstadoLeccionProgreso,
-} from '../../../docente/entities/leccion-progreso.entity';
-import {
-  TareaEntrega,
-  EstadoEntregaTarea,
-  ResultadoCalificacion,
-} from '../../../docente/entities/tarea-entrega.entity';
+import { TareaEntrega, EstadoEntregaTarea, ResultadoCalificacion } from '../../../docente/entities/tarea-entrega.entity';
+import { Tarea, EstadoTareaEntidad } from '../../../docente/entities/tarea.entity';
+import { Docente } from '../../../docente/entities/docente.entity';
 import { Lecciones } from '../../../lecciones/entities/lecciones.entity';
+import { ProgressGateway } from '../../../progress/progress.gateway';
 
 @Injectable()
 export class EstudiantesService {
 
     constructor(
         @InjectRepository(Estudiante) private estudianteRepo: Repository<Estudiante>,
-        @InjectRepository(LeccionProgreso) private leccionProgresoRepo: Repository<LeccionProgreso>,
+        @InjectRepository(TareaEntrega) private entregaRepo: Repository<TareaEntrega>,
+        @InjectRepository(Tarea) private tareaRepo: Repository<Tarea>,
+        @InjectRepository(Docente) private docenteRepo: Repository<Docente>,
         @InjectRepository(Lecciones) private leccionesRepo: Repository<Lecciones>,
         @InjectRepository(TareaEntrega) private entregaRepo: Repository<TareaEntrega>,
         private usersService: UsersService,
+        private progressGateway: ProgressGateway,
     ) {}
 
     async findAll() {
@@ -101,66 +99,70 @@ export class EstudiantesService {
         }
         return await this.estudianteRepo.remove(estudiante);
     }
+
     async findByUserId(userId: number) {
-    const estudiante = await this.estudianteRepo.findOne({
-        where: { user: { id: userId } },
-        relations: {
-            user: true,
-            cursos: true,
-            foros: true,
-            mensajes: {
-                docente: {
-                    user: true
-                }
+        const estudiante = await this.estudianteRepo.findOne({
+            where: { user: { id: userId } },
+            relations: {
+                user: true,
+                cursos: true,
+                foros: true,
+                mensajes: {
+                    docente: {
+                        user: true
+                    }
+                },
+                leccionesCompletadas: {
+                    modulo: true
+                },
             },
-            leccionesCompletadas: true,
-        },
-    });
-    if (!estudiante) throw new NotFoundException(`Estudiante del usuario #${userId} no encontrado`);
+        });
+        if (!estudiante) throw new NotFoundException(`Estudiante del usuario #${userId} no encontrado`);
 
-    const tareasEntregas = await this.entregaRepo.find({
-        where: { estudiante: { id: estudiante.id } },
-        relations: {
-            tarea: {
-                leccion: { modulo: true },
-                modulo: true,
+        const tareasEntregas = await this.entregaRepo.find({
+            where: { estudiante: { id: estudiante.id } },
+            relations: {
+                tarea: {
+                    leccion: { modulo: true },
+                    modulo: true,
+                },
             },
-        },
-    });
+        });
 
-    return {
-        ...estudiante,
-        tareasEntregas: tareasEntregas.map((e) => ({
-            id: e.id,
-            resultado: e.resultado,
-            estado: e.estado,
-            tarea: e.tarea
-                ? {
-                      id: e.tarea.id,
-                      titulo: e.tarea.titulo,
-                      leccion: e.tarea.leccion
-                          ? {
-                                id: e.tarea.leccion.id,
-                                titulo: e.tarea.leccion.titulo,
-                                orden: Number(e.tarea.leccion.orden),
-                            }
-                          : null,
-                      modulo: e.tarea.modulo
-                          ? {
-                                id: e.tarea.modulo.id,
-                                titulo: e.tarea.modulo.titulo,
-                                orden: e.tarea.modulo.orden,
-                            }
-                          : null,
-                  }
-                : null,
-        })),
-    };
-}
+        return {
+            ...estudiante,
+            tareasEntregas: tareasEntregas.map((e) => ({
+                id: e.id,
+                resultado: e.resultado,
+                estado: e.estado,
+                tarea: e.tarea
+                    ? {
+                          id: e.tarea.id,
+                          titulo: e.tarea.titulo,
+                          leccion: e.tarea.leccion
+                              ? {
+                                    id: e.tarea.leccion.id,
+                                    titulo: e.tarea.leccion.titulo,
+                                    orden: Number(e.tarea.leccion.orden),
+                                }
+                              : null,
+                          modulo: e.tarea.modulo
+                              ? {
+                                    id: e.tarea.modulo.id,
+                                    titulo: e.tarea.modulo.titulo,
+                                    orden: e.tarea.modulo.orden,
+                                }
+                              : null,
+                      }
+                    : null,
+            })),
+        };
+    }
 
 async marcarTareaEntregada(userId: number, moduloOrden: number, leccionOrden: number) {
     const estudiante = await this.estudianteRepo.findOne({
         where: { user: { id: userId } },
+        relations: ['cursos', 'cursos.docente'],
     });
     if (!estudiante) throw new NotFoundException(`Estudiante del usuario #${userId} no encontrado`);
 
@@ -171,18 +173,15 @@ async marcarTareaEntregada(userId: number, moduloOrden: number, leccionOrden: nu
         .innerJoinAndSelect('entrega.tarea', 'tarea')
         .innerJoinAndSelect('tarea.modulo', 'modulo')
         .leftJoinAndSelect('tarea.leccion', 'leccion')
+        .leftJoinAndSelect('tarea.docente', 'docente')
+        .leftJoinAndSelect('tarea.curso', 'curso')
         .where('est.id = :estudianteId', { estudianteId: estudiante.id })
         .andWhere('modulo.orden = :moduloOrden', { moduloOrden })
-        .andWhere('leccion.orden = :leccionOrden', { leccionOrden: String(leccionOrden) })
+        .andWhere('leccion.orden = :leccionOrden', { leccionOrden })
         .getOne();
 
     if (!entrega) {
-        // Sin gate de docente: buscar la lección dentro de los cursos inscritos del estudiante
-        const estudianteConCursos = await this.estudianteRepo.findOne({
-            where: { id: estudiante.id },
-            relations: ['cursos'],
-        });
-        const cursoIds = estudianteConCursos?.cursos.map(c => c.id) ?? [];
+        const cursoIds = (estudiante.cursos ?? []).map(c => c.id);
 
         if (cursoIds.length === 0) {
             return { success: false, completed: false, message: 'No se encontró una tarea asociada a esta lección' };
@@ -190,18 +189,63 @@ async marcarTareaEntregada(userId: number, moduloOrden: number, leccionOrden: nu
 
         const leccion = await this.leccionesRepo
             .createQueryBuilder('leccion')
-            .innerJoin('leccion.modulo', 'modulo')
-            .innerJoin('modulo.curso', 'curso')
-            .where('leccion.orden = :leccionOrden', { leccionOrden: String(leccionOrden) })
+            .innerJoinAndSelect('leccion.modulo', 'modulo')
+            .innerJoinAndSelect('modulo.curso', 'curso')
+            .leftJoinAndSelect('curso.docente', 'docente')
+            .where('leccion.orden = :leccionOrden', { leccionOrden })
             .andWhere('modulo.orden = :moduloOrden', { moduloOrden })
             .andWhere('curso.id IN (:...cursoIds)', { cursoIds })
             .getOne();
 
         if (leccion) {
-            await this.marcarLeccionCompletada(userId, leccion.id);
-            return { success: true, completed: true, message: 'Lección completada exitosamente' };
+            const modulo = leccion.modulo;
+            const curso = modulo.curso;
+            const docente = curso.docente;
+
+            // Check if Tarea already exists for another student/docente combination
+            let tarea = await this.tareaRepo.findOne({
+                where: {
+                    curso: { id: curso.id },
+                    leccion: { id: leccion.id },
+                },
+            });
+
+            if (!tarea) {
+                tarea = await this.tareaRepo.save(
+                    this.tareaRepo.create({
+                        titulo: `${modulo.titulo} — ${leccion.titulo}`,
+                        descripcion: `Completar la lección "${leccion.titulo}" del módulo "${modulo.titulo}" del curso "${curso.nombre}".`,
+                        fechaVencimiento: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+                        estado: EstadoTareaEntidad.PENDIENTE,
+                        docente: docente || undefined,
+                        curso,
+                        modulo,
+                        leccion,
+                    }),
+                );
+            }
+
+            // Create delivery
+            const nuevaEntrega = this.entregaRepo.create({
+                tarea,
+                estudiante,
+                estado: EstadoEntregaTarea.ENTREGADO,
+                calificacion: null,
+                resultado: null,
+                fechaEntrega: new Date(),
+            });
+            await this.entregaRepo.save(nuevaEntrega);
+
+            // Notify teacher via WebSocket so their task list refreshes in real time
+            this.progressGateway.emitProgresoActualizado(cursoIds, estudiante.id, {
+                estudianteId: estudiante.id,
+                progreso: estudiante.progreso ?? 0,
+                leccionesCompletadas: estudiante.leccionesCompletadas?.length ?? 0,
+            });
+
+            return { success: true, completed: false, message: 'Lección enviada para revisión del docente' };
         }
-        return { success: false, completed: false, message: 'No se encontró una tarea asociada a esta lección' };
+        return { success: false, completed: false, message: 'No se encontró una lección asociada' };
     }
 
     if (
@@ -222,6 +266,14 @@ async marcarTareaEntregada(userId: number, moduloOrden: number, leccionOrden: nu
         await this.entregaRepo.save(entrega);
     }
     // If already calificado + APROBADO: nothing to do (shouldn't re-submit an approved lesson)
+
+    // Notify teacher via WebSocket so their task list refreshes in real time
+    const cursoIds = (estudiante.cursos ?? []).map(c => c.id);
+    this.progressGateway.emitProgresoActualizado(cursoIds, estudiante.id, {
+        estudianteId: estudiante.id,
+        progreso: estudiante.progreso ?? 0,
+        leccionesCompletadas: estudiante.leccionesCompletadas?.length ?? 0,
+    });
 
     return { success: true, message: 'Lección enviada para revisión del docente' };
 }
@@ -267,67 +319,17 @@ async marcarLeccionCompletada(userId: number, leccionId: number) {
         estudiante.progreso = Math.min(100, completadas * 10);
     }
 
-    return await this.estudianteRepo.save(estudiante);
-}
+    const saved = await this.estudianteRepo.save(estudiante);
 
-    async completarLeccion(userId: number, leccionId: number) {
-        const estudiante = await this.estudianteRepo.findOne({
-            where: { user: { id: userId } },
-            relations: ['cursos', 'cursos.modulos', 'cursos.modulos.lecciones'],
-        });
-        if (!estudiante) {
-            throw new NotFoundException('Estudiante no encontrado');
-        }
+    // Emitir evento WebSocket a docentes y al propio estudiante
+    const cursoIds = (estudiante.cursos ?? []).map(c => c.id);
+    this.progressGateway.emitProgresoActualizado(cursoIds, estudiante.id, {
+      estudianteId: estudiante.id,
+      progreso: saved.progreso,
+      leccionesCompletadas: saved.leccionesCompletadas.length,
+      leccionId,
+    });
 
-        const tieneAcceso = (estudiante.cursos ?? [])
-            .flatMap(c => c.modulos ?? [])
-            .flatMap(m => m.lecciones ?? [])
-            .some(l => l.id === leccionId);
-
-        if (!tieneAcceso) {
-            throw new BadRequestException('No tienes acceso a esta lección o no existe');
-        }
-
-        const existente = await this.leccionProgresoRepo.findOne({
-            where: { estudiante: { id: estudiante.id }, leccion: { id: leccionId } },
-        });
-
-        if (existente?.estado === EstadoLeccionProgreso.APROBADO) {
-            throw new BadRequestException('Esta lección ya fue aprobada por el docente');
-        }
-        if (existente?.estado === EstadoLeccionProgreso.PENDIENTE) {
-            return {
-                message: 'Tu solicitud ya está pendiente de revisión por el docente',
-                progresoId: existente.id,
-                estado: existente.estado,
-            };
-        }
-
-        const leccion = await this.leccionesRepo.findOne({ where: { id: leccionId } });
-        if (!leccion) throw new NotFoundException(`Lección #${leccionId} no encontrada`);
-
-        if (existente) {
-            existente.estado = EstadoLeccionProgreso.PENDIENTE;
-            existente.comentario = null;
-            existente.fechaRevision = null;
-            const guardado = await this.leccionProgresoRepo.save(existente);
-            return {
-                message: 'Lección marcada como completada. Esperando aprobación del docente.',
-                progresoId: guardado.id,
-                estado: guardado.estado,
-            };
-        }
-
-        const progreso = this.leccionProgresoRepo.create({
-            estudiante,
-            leccion,
-            estado: EstadoLeccionProgreso.PENDIENTE,
-        });
-        const guardado = await this.leccionProgresoRepo.save(progreso);
-        return {
-            message: 'Lección marcada como completada. Esperando aprobación del docente.',
-            progresoId: guardado.id,
-            estado: guardado.estado,
-        };
-    }
+    return saved;
+  }
 }

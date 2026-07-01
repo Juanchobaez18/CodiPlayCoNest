@@ -13,79 +13,79 @@ import { Curso } from '../curso/entity/curso.entity/curso.entity';
 import { Modulos } from '../modulos/entities/modulos.entity';
 import { Lecciones } from '../lecciones/entities/lecciones.entity';
 
-const MODULO1_LECCIONES: { titulo: string; descripcion: string; orden: string }[] = [
+const MODULO1_LECCIONES: { titulo: string; descripcion: string; orden: number }[] = [
   {
     titulo: '¿Qué es Internet y las Páginas Web?',
     descripcion: 'Explicación con dibujos y ejemplos de qué es una página web y cómo funciona Internet. Dibujar cómo se imagina su propia web.',
-    orden: '1',
+    orden: 1,
   },
   {
     titulo: 'Introducción a HTML',
     descripcion: 'Explicar qué es HTML, para qué sirve y crear su primera estructura básica. Escribir una página con su nombre.',
-    orden: '2',
+    orden: 2,
   },
   {
     titulo: 'Etiquetas de Título y Texto',
     descripcion: 'Aprender etiquetas básicas de HTML: h1–h3 y p. Crear una hoja con 3 títulos y 3 párrafos.',
-    orden: '3',
+    orden: 3,
   },
   {
     titulo: 'Agregar Imágenes con HTML',
     descripcion: 'Etiqueta img, rutas de imagen. Colocar 3 imágenes favoritas.',
-    orden: '4',
+    orden: 4,
   },
   {
     titulo: 'Listas en HTML',
     descripcion: 'Listas ordenadas y desordenadas (ul, ol, li). Crear lista de juguetes o películas favoritas.',
-    orden: '5',
+    orden: 5,
   },
   {
     titulo: 'Enlaces y Navegación',
     descripcion: 'Etiqueta a y href para crear enlaces. Crear un menú con enlaces ficticios.',
-    orden: '6',
+    orden: 6,
   },
   {
     titulo: 'Tablas Básicas',
     descripcion: 'Crear tablas sencillas con table, tr, td. Crear una tabla de calificaciones ficticias.',
-    orden: '7',
+    orden: 7,
   },
   {
     titulo: 'Formularios Simples',
     descripcion: 'Etiquetas input, label, button. Crear un formulario con nombre y edad.',
-    orden: '8',
+    orden: 8,
   },
   {
     titulo: 'Proyecto Mini Página Personal',
     descripcion: 'Integrar imágenes, texto y enlaces en una sola página. Personalizar su página.',
-    orden: '9',
+    orden: 9,
   },
 ];
 
-const MODULO2_LECCIONES: { titulo: string; descripcion: string; orden: string }[] = [
+const MODULO2_LECCIONES: { titulo: string; descripcion: string; orden: number }[] = [
   {
     titulo: 'Introducción a CSS',
     descripcion: 'Qué es CSS, para qué sirve y cómo conectarlo al HTML. Sintaxis básica: selectores, propiedades y valores.',
-    orden: '1',
+    orden: 1,
   },
   {
     titulo: 'Colores y Fondos CSS',
     descripcion: 'Aplicar colores de texto, fondo e imágenes de fondo. Degradados con linear-gradient y radial-gradient.',
-    orden: '2',
+    orden: 2,
   },
   {
     titulo: 'Tamaño y Tipo de Letra',
     descripcion: 'Controlar fuentes con font-size, font-family, font-weight. Importar fuentes desde Google Fonts.',
-    orden: '3',
+    orden: 3,
   },
   {
     titulo: 'Bordes y Márgenes',
     descripcion: 'El modelo de caja CSS: margin, padding, border y border-radius. Centrar elementos.',
-    orden: '4',
+    orden: 4,
   },
   {
     titulo: 'Decorar Listas y Tablas con CSS',
     descripcion: 'Dar estilo profesional a listas (list-style, hover) y tablas (border-collapse, zebra striping).',
-    orden: '5',
+    orden: 5,
   },
 ];
 

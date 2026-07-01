@@ -12,8 +12,8 @@ export class Lecciones {
         descripcion: string;
         @Column()
         contenido: string;
-        @Column()
-        orden: string;
+        @Column({ type: 'int' })
+        orden: number;
 
 @ManyToOne(() => Modulos, modulos => modulos.lecciones)
 modulo: Modulos;
