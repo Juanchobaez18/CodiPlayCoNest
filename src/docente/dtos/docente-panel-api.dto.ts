@@ -8,6 +8,7 @@ import {
   Min,
   MaxLength,
   MinLength,
+  IsIn,
 } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 import { ResultadoCalificacion } from '../entities/tarea-entrega.entity';

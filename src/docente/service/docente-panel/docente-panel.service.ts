@@ -35,6 +35,7 @@ import {
   CreateForoPanelDto,
   UpdateForoPanelDto,
   UpdateFechaVencimientoDto,
+  RevisarLeccionProgresoDto,
 } from '../../dtos/docente-panel-api.dto';
 import { Modulos } from 'src/modulos/entities/modulos.entity';
 import { ProgressGateway } from 'src/progress/progress.gateway';
@@ -64,6 +65,8 @@ export class DocentePanelService {
     private readonly userRepository: Repository<User>,
     @InjectRepository(Modulos)
     private readonly moduloRepository: Repository<Modulos>,
+    @InjectRepository(LeccionProgreso)
+    private readonly leccionProgresoRepository: Repository<LeccionProgreso>,
     private readonly progressGateway: ProgressGateway,
   ) {}
 
