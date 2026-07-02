@@ -21,7 +21,8 @@ import { PaymentsModule } from './payments/payments.module';
 import { ForosModule } from './foros/foros.module';
 import { ContactModule } from './contact/contact.module';
 import { AdminModule } from './admin/admin.module';
-import { ProgressModule } from './progress/progress.module';
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
+import { APP_GUARD } from '@nestjs/core';
 
 @Module({
   imports: [
@@ -50,6 +51,10 @@ import { ProgressModule } from './progress/progress.module';
         STRIPE_WEBHOOK_SECRET: Joi.string().required(),
       }),
     }),
+    ThrottlerModule.forRoot([{
+      ttl: 60000,
+      limit: 100,
+    }]),
     DatabaseModule,
     AuthModule,
     UsersModule,
@@ -68,6 +73,12 @@ import { ProgressModule } from './progress/progress.module';
     ProgressModule,
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [
+    AppService,
+    {
+      provide: APP_GUARD,
+      useClass: ThrottlerGuard,
+    },
+  ],
 })
 export class AppModule {}
