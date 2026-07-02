@@ -1,4 +1,5 @@
-import { Body, Controller, Get, Header, HttpCode, HttpStatus, Post, Request, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Header, HttpCode, HttpStatus, Post, Request, Res, UseGuards } from '@nestjs/common';
+import type { Response } from 'express';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { LoginDto } from '../dtos/login.dto';
 import { RegisterEstudianteDto } from '../dtos/register-estudiante.dto';
@@ -53,5 +54,11 @@ export class AuthController {
     @ApiOperation({ summary: 'Perfil del estudiante autenticado con sus cursos inscritos' })
     perfilEstudiante(@Request() req) {
         return this.estudiantesService.findByUserId(req.user.id);
+    }
+
+    @Get('logout')
+    @ApiOperation({ summary: 'Cerrar sesión y redirigir a la landing page' })
+    logout(@Res() res: Response) {
+        return res.redirect('/');
     }
 }
