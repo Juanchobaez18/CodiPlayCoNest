@@ -235,7 +235,7 @@ export class PaymentsService {
       if (estudiante && curso) {
         const alreadyEnrolled = estudiante.cursos.some((c) => c.id === curso.id);
         if (!alreadyEnrolled) {
-          estudiante.cursos.push(curso);
+          estudiante.cursos = [...estudiante.cursos, curso];
           await this.estudianteRepository.save(estudiante);
         }
       }
@@ -308,7 +308,7 @@ export class PaymentsService {
       where: { id: cursoId },
     });
     if (est && curso && !est.cursos.some((c) => c.id === curso.id)) {
-      est.cursos.push(curso);
+      est.cursos = [...est.cursos, curso];
       await this.estudianteRepository.save(est);
     }
   }
