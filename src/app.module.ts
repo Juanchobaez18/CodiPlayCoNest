@@ -23,6 +23,7 @@ import { ContactModule } from './contact/contact.module';
 import { AdminModule } from './admin/admin.module';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { APP_GUARD } from '@nestjs/core';
+import { ProgressModule } from './progress/progress.module';
 
 @Module({
   imports: [
