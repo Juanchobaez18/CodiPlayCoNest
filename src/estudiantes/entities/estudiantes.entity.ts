@@ -44,7 +44,7 @@ progreso: number;
   @OneToMany(() => ForoRespuesta, (respuesta) => respuesta.estudiante)
   foroRespuestas: ForoRespuesta[];
 
-  @ManyToMany(() => Lecciones)
+  @ManyToMany(() => Lecciones, { cascade: true })
   @JoinTable()
   leccionesCompletadas: Lecciones[];
 }

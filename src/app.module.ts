@@ -70,6 +70,7 @@ import { APP_GUARD } from '@nestjs/core';
     MensajesModule,
     ContactModule,
     AdminModule,
+    ProgressModule,
   ],
   controllers: [AppController],
   providers: [

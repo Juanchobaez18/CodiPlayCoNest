@@ -20,6 +20,10 @@ import {
   TareaEntrega,
   EstadoEntregaTarea,
 } from '../../entities/tarea-entrega.entity';
+import {
+  LeccionProgreso,
+  EstadoLeccionProgreso,
+} from '../../entities/leccion-progreso.entity';
 import { User } from 'src/users/entities/user.entity';
 import {
   RemitenteTipo,
@@ -30,8 +34,11 @@ import {
   CalificarTareaDto,
   CreateForoPanelDto,
   UpdateForoPanelDto,
+  UpdateFechaVencimientoDto,
+  RevisarLeccionProgresoDto,
 } from '../../dtos/docente-panel-api.dto';
 import { Modulos } from 'src/modulos/entities/modulos.entity';
+import { ProgressGateway } from 'src/progress/progress.gateway';
 
 type EstadoProgresoEstudiante = 'completado' | 'en_progreso' | 'iniciando';
 
@@ -58,6 +65,9 @@ export class DocentePanelService {
     private readonly userRepository: Repository<User>,
     @InjectRepository(Modulos)
     private readonly moduloRepository: Repository<Modulos>,
+    @InjectRepository(LeccionProgreso)
+    private readonly leccionProgresoRepository: Repository<LeccionProgreso>,
+    private readonly progressGateway: ProgressGateway,
   ) {}
 
   private async assertDocente(docenteId: number): Promise<Docente> {
@@ -77,7 +87,14 @@ export class DocentePanelService {
   ): Promise<Curso> {
     const curso = await this.cursoRepository.findOne({
       where: { id: cursoId, docente: { id: docenteId } },
-      relations: ['docente', 'estudiantes', 'estudiantes.user', 'modulos', 'modulos.lecciones'],
+      relations: [
+        'docente',
+        'estudiantes',
+        'estudiantes.user',
+        'estudiantes.leccionesCompletadas',
+        'modulos',
+        'modulos.lecciones',
+      ],
     });
     if (!curso) {
       throw new NotFoundException('Curso no encontrado o sin acceso');
@@ -109,39 +126,40 @@ export class DocentePanelService {
       (acc, m) => acc + (m.lecciones?.length ?? 0),
       0,
     );
-    if (!leccionesTotales) {
-      return {};
-    }
+    if (!leccionesTotales) return {};
 
     const leccionesCompletadas = Math.floor(
       (Math.min(100, Math.max(0, progreso)) / 100) * leccionesTotales,
     );
-    let contador = 0;
 
+    let contador = 0;
     for (const modulo of ordenados) {
       const lecciones = [...(modulo.lecciones ?? [])].sort(
         (a, b) => Number(a.orden) - Number(b.orden),
       );
-      for (const leccion of lecciones) {
-        if (contador >= leccionesCompletadas) {
-          const progresoModulo =
-            lecciones.length > 0
-              ? Math.round(
-                  ((leccionesCompletadas - (contador - lecciones.indexOf(leccion))) /
-                    lecciones.length) *
-                    100,
-                )
-              : 0;
-          return {
-            moduloActual: modulo.titulo,
-            leccionActual: leccion.titulo,
-            progresoModulo: Math.min(100, Math.max(0, progresoModulo || progreso)),
-          };
-        }
-        contador++;
+      const totalEnModulo = lecciones.length;
+      const completadasEnModulo = Math.min(
+        totalEnModulo,
+        Math.max(0, leccionesCompletadas - contador),
+      );
+      if (leccionesCompletadas <= contador + totalEnModulo) {
+        // El estudiante está en este módulo
+        const leccionIdx = Math.min(completadasEnModulo, totalEnModulo - 1);
+        const leccionActual = lecciones[leccionIdx];
+        const progresoModulo =
+          totalEnModulo > 0
+            ? Math.round((completadasEnModulo / totalEnModulo) * 100)
+            : 0;
+        return {
+          moduloActual: modulo.titulo,
+          leccionActual: leccionActual?.titulo,
+          progresoModulo,
+        };
       }
+      contador += totalEnModulo;
     }
 
+    // Completó todo — retornar el último módulo/lección
     const ultimo = ordenados[ordenados.length - 1];
     const ultimaLeccion = ultimo?.lecciones?.[ultimo.lecciones.length - 1];
     return {
@@ -191,18 +209,46 @@ export class DocentePanelService {
 
     const cursos = await this.cursoRepository.find({
       where,
-      relations: ['estudiantes'],
+      relations: [
+        'estudiantes',
+        'estudiantes.leccionesCompletadas',
+        'modulos',
+        'modulos.lecciones',
+      ],
       order: { id: 'ASC' },
     });
 
-    return cursos.map((curso) => ({
-      id: curso.id,
-      nombre: curso.nombre,
-      descripcion: curso.descripcion,
-      estudiantes: curso.estudiantes?.length ?? 0,
-      progreso: this.calcularProgresoPromedio(curso.estudiantes ?? []),
-      estado: curso.estado,
-    }));
+    return cursos.map((curso) => {
+      // Total lessons in this course
+      const totalLecciones = (curso.modulos ?? []).reduce(
+        (acc, m) => acc + (m.lecciones?.length ?? 0),
+        0,
+      );
+      // Build a set of lesson IDs that belong to this course
+      const leccionIdsDelCurso = new Set<number>(
+        (curso.modulos ?? []).flatMap(m => (m.lecciones ?? []).map(l => l.id)),
+      );
+      // Average completion across enrolled students, relative to THIS course only
+      const progreso =
+        curso.estudiantes?.length && totalLecciones > 0
+          ? Math.round(
+              curso.estudiantes.reduce((sum, est) => {
+                const completadasEnCurso = (est.leccionesCompletadas ?? []).filter(l =>
+                  leccionIdsDelCurso.has(l.id),
+                ).length;
+                return sum + (completadasEnCurso / totalLecciones) * 100;
+              }, 0) / curso.estudiantes.length,
+            )
+          : 0;
+      return {
+        id: curso.id,
+        nombre: curso.nombre,
+        descripcion: curso.descripcion,
+        estudiantes: (curso.estudiantes ?? []).map(e => ({ id: e.id })),
+        progreso,
+        estado: curso.estado,
+      };
+    });
   }
 
   async getCursoDetalle(docenteId: number, cursoId: number) {
@@ -211,8 +257,19 @@ export class DocentePanelService {
       (a, b) => a.orden - b.orden,
     );
 
+    const totalLecciones = modulosOrdenados.reduce(
+      (acc, m) => acc + (m.lecciones?.length ?? 0),
+      0,
+    );
+    const leccionIdsDelCurso = new Set<number>(
+      modulosOrdenados.flatMap(m => (m.lecciones ?? []).map(l => l.id)),
+    );
+
     const estudiantes = (curso.estudiantes ?? []).map((est) => {
-      const progreso = est.progreso ?? 0;
+      const completadasEnCurso = (est.leccionesCompletadas ?? []).filter(l =>
+        leccionIdsDelCurso.has(l.id),
+      ).length;
+      const progreso = totalLecciones > 0 ? Math.round((completadasEnCurso / totalLecciones) * 100) : 0;
       const posicion = this.calcularPosicionModulo(progreso, modulosOrdenados);
       const estado = this.estadoProgreso(progreso);
       return {
@@ -256,9 +313,10 @@ export class DocentePanelService {
       where: cursoId
         ? { docente: { id: docenteId }, id: cursoId }
         : { docente: { id: docenteId } },
-      relations: ['estudiantes', 'estudiantes.user'],
+      relations: ['estudiantes', 'estudiantes.user', 'estudiantes.leccionesCompletadas'],
     });
 
+    // Mapa: estudianteId → datos agregados (evita duplicados)
     const map = new Map<
       number,
       {
@@ -267,40 +325,142 @@ export class DocentePanelService {
         apellido: string;
         email: string;
         cursos: string[];
-        progresoTotal: number;
-        contador: number;
+        progreso: number;
       }
     >();
 
     for (const curso of cursos) {
       for (const est of curso.estudiantes ?? []) {
-        if (!map.has(est.id)) {
+        if (map.has(est.id)) {
+          // Solo agregar el nombre del curso adicional
+          map.get(est.id)!.cursos.push(curso.nombre);
+        } else {
           map.set(est.id, {
             id: est.id,
             nombre: est.user?.name ?? 'Desconocido',
             apellido: est.user?.lastName ?? '',
             email: est.user?.email ?? '',
-            cursos: [],
-            progresoTotal: 0,
-            contador: 0,
+            cursos: [curso.nombre],
+            progreso: est.progreso ?? 0,
           });
         }
-        const row = map.get(est.id)!;
-        row.cursos.push(curso.nombre);
-        row.progresoTotal += est.progreso ?? 0;
-        row.contador++;
       }
     }
 
-    return Array.from(map.values()).map((row) => ({
-      id: row.id,
-      nombre: row.nombre,
-      apellido: row.apellido,
-      email: row.email,
-      cursos: row.cursos,
-      progreso:
-        row.contador > 0 ? Math.round(row.progresoTotal / row.contador) : 0,
-    }));
+    return Array.from(map.values());
+  }
+
+  /**
+   * Retorna el progreso detallado de un estudiante (desglose por módulo y lección)
+   * para el panel del docente.
+   */
+  async getEstudianteProgreso(docenteId: number, estudianteId: number) {
+    await this.assertDocente(docenteId);
+
+    const estudiante = await this.estudianteRepository.findOne({
+      where: { id: estudianteId },
+      relations: [
+        'user',
+        'cursos',
+        'cursos.modulos',
+        'cursos.modulos.lecciones',
+        'leccionesCompletadas',
+      ],
+    });
+    if (!estudiante) {
+      throw new NotFoundException('Estudiante no encontrado');
+    }
+
+    // Verificar que el estudiante pertenece a un curso del docente
+    const cursosDelDocente = await this.cursoRepository.find({
+      where: { docente: { id: docenteId } },
+    });
+    const cursosDocIds = new Set(cursosDelDocente.map(c => c.id));
+    const cursosDelEstudiante = (estudiante.cursos ?? []).filter(c => cursosDocIds.has(c.id));
+    if (cursosDelEstudiante.length === 0) {
+      throw new ForbiddenException('El estudiante no pertenece a ningún curso de este docente');
+    }
+
+    const leccionesCompletadasIds = new Set(
+      (estudiante.leccionesCompletadas ?? []).map(l => l.id),
+    );
+
+    // Construir desglose por módulo
+    const progresoModulos: {
+      moduloId: number;
+      moduloTitulo: string;
+      orden: number;
+      cursoNombre: string;
+      totalLecciones: number;
+      leccionesCompletadas: number;
+      porcentaje: number;
+      lecciones: { id: number; titulo: string; orden: number; completada: boolean }[];
+    }[] = [];
+    let totalLecciones = 0;
+
+    for (const curso of cursosDelEstudiante) {
+      const modulosOrdenados = [...(curso.modulos ?? [])].sort((a, b) => a.orden - b.orden);
+      for (const modulo of modulosOrdenados) {
+        const lecciones = [...(modulo.lecciones ?? [])].sort(
+          (a, b) => Number(a.orden) - Number(b.orden),
+        );
+        const completadasEnModulo = lecciones.filter(l => leccionesCompletadasIds.has(l.id));
+        totalLecciones += lecciones.length;
+        progresoModulos.push({
+          moduloId: modulo.id,
+          moduloTitulo: modulo.titulo,
+          orden: modulo.orden,
+          cursoNombre: curso.nombre,
+          totalLecciones: lecciones.length,
+          leccionesCompletadas: completadasEnModulo.length,
+          porcentaje:
+            lecciones.length > 0
+              ? Math.round((completadasEnModulo.length / lecciones.length) * 100)
+              : 0,
+          lecciones: lecciones.map(l => ({
+            id: l.id,
+            titulo: l.titulo,
+            orden: l.orden,
+            completada: leccionesCompletadasIds.has(l.id),
+          })),
+        });
+      }
+    }
+
+    // Tareas y entregas
+    const tareasEntregas = await this.entregaRepository.find({
+      where: { estudiante: { id: estudianteId } },
+      relations: ['tarea', 'tarea.leccion', 'tarea.modulo'],
+    });
+
+    return {
+      estudianteId: estudiante.id,
+      nombre: estudiante.user?.name ?? '',
+      apellido: estudiante.user?.lastName ?? '',
+      email: estudiante.user?.email ?? '',
+      progresoGlobal: estudiante.progreso ?? 0,
+      totalLeccionesCompletadas: leccionesCompletadasIds.size,
+      totalLecciones,
+      progresoModulos,
+      tareasEntregas: tareasEntregas.map(e => ({
+        id: e.id,
+        estado: e.estado,
+        resultado: e.resultado,
+        calificacion: e.calificacion,
+        tarea: e.tarea
+          ? {
+              id: e.tarea.id,
+              titulo: e.tarea.titulo,
+              leccion: e.tarea.leccion
+                ? { id: e.tarea.leccion.id, titulo: e.tarea.leccion.titulo }
+                : null,
+              modulo: e.tarea.modulo
+                ? { id: e.tarea.modulo.id, titulo: e.tarea.modulo.titulo }
+                : null,
+            }
+          : null,
+      })),
+    };
   }
 
   async getTareas(docenteId: number, cursoId?: number) {
@@ -315,23 +475,36 @@ export class DocentePanelService {
       where.curso = { id: cursoId };
     }
 
-    return (
-      await this.tareaRepository.find({
-        where,
-        relations: [
-          'curso',
-          'modulo',
-          'leccion',
-          'entregas',
-          'entregas.estudiante',
-          'entregas.estudiante.user',
-        ],
-        order: { fechaVencimiento: 'DESC' },
-      })
-    ).map((tarea) => this.mapTareaResponse(tarea));
+    const allTareas = await this.tareaRepository.find({
+      where,
+      relations: [
+        'curso',
+        'modulo',
+        'leccion',
+        'entregas',
+        'entregas.estudiante',
+        'entregas.estudiante.user',
+      ],
+      order: { fechaVencimiento: 'DESC' },
+    });
+
+    const filteredTareas = allTareas.map((tarea) => {
+      const pendingDeliveries = (tarea.entregas ?? []).filter(
+        (e) => e.estado === EstadoEntregaTarea.ENTREGADO,
+      );
+      if (pendingDeliveries.length === 0) {
+        return null;
+      }
+      return {
+        ...tarea,
+        entregas: pendingDeliveries,
+      };
+    }).filter((t): t is NonNullable<typeof t> => t !== null);
+
+    return filteredTareas.map((tarea) => this.mapTareaResponse(tarea));
   }
 
-  private async ensureTareasParaCursos(docenteId: number, cursoId?: number) {
+  private async ensureTareasParaCursos(docenteId: number, cursoId?: number): Promise<void> {
     const docente = await this.assertDocente(docenteId);
 
     const cursosWhere: Record<string, unknown> = { docente: { id: docenteId } };
@@ -343,41 +516,195 @@ export class DocentePanelService {
     });
 
     for (const curso of cursos) {
-      // Create a task for this course if none exists yet
-      const tareaExistente = await this.tareaRepository.findOne({
-        where: { docente: { id: docenteId }, curso: { id: curso.id } },
-        relations: ['entregas', 'entregas.estudiante'],
-      });
+      const modulosOrdenados = [...(curso.modulos ?? [])].sort((a, b) => a.orden - b.orden);
 
-      let tarea: Tarea;
-      if (!tareaExistente) {
-        const modulo = [...(curso.modulos ?? [])].sort((a, b) => a.orden - b.orden)[0];
-        const leccion = modulo?.lecciones?.[0];
-        tarea = await this.tareaRepository.save(
-          this.tareaRepository.create({
-            titulo: modulo
-              ? `Actividad: ${modulo.titulo}`
-              : `Inscripción: ${curso.nombre}`,
-            descripcion: leccion
-              ? `Completar la lección "${leccion.titulo}" del módulo ${modulo!.titulo}.`
-              : modulo
-              ? `Actividad del módulo ${modulo.titulo} en ${curso.nombre}.`
-              : `Revisar y aprobar la inscripción de los estudiantes al curso "${curso.nombre}".`,
-            fechaVencimiento: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
-            estado: EstadoTareaEntidad.PENDIENTE,
-            docente,
-            curso,
-            modulo: modulo ?? null,
-            leccion: leccion ?? null,
-          }),
+      // Create one Tarea per lesson so the teacher can approve each one individually
+      for (const modulo of modulosOrdenados) {
+        const leccionesOrdenadas = [...(modulo.lecciones ?? [])].sort(
+          (a, b) => Number(a.orden) - Number(b.orden),
         );
-      } else {
-        tarea = tareaExistente;
+        for (const leccion of leccionesOrdenadas) {
+          const tareaExistente = await this.tareaRepository.findOne({
+            where: {
+              docente: { id: docenteId },
+              curso: { id: curso.id },
+              leccion: { id: leccion.id },
+            },
+            relations: ['entregas', 'entregas.estudiante'],
+          });
+
+          let tarea: Tarea;
+          if (!tareaExistente) {
+            tarea = await this.tareaRepository.save(
+              this.tareaRepository.create({
+                titulo: `${modulo.titulo} — ${leccion.titulo}`,
+                descripcion: `Completar la lección "${leccion.titulo}" del módulo "${modulo.titulo}" del curso "${curso.nombre}".`,
+                fechaVencimiento: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+                estado: EstadoTareaEntidad.PENDIENTE,
+                docente,
+                curso,
+                modulo,
+                leccion,
+              }),
+            );
+          } else {
+            tarea = tareaExistente;
+          }
+
+          // Always sync enrolled students so late-enrollers appear
+          await this.syncEntregasTarea(tarea, curso.estudiantes ?? []);
+        }
       }
 
-      // Always sync enrolled students so late-enrollers appear
-      await this.syncEntregasTarea(tarea, curso.estudiantes ?? []);
+      // Fallback: if the course has no modules yet, create one generic task
+      if (modulosOrdenados.length === 0) {
+        const existsGeneric = await this.tareaRepository.findOne({
+          where: { docente: { id: docenteId }, curso: { id: curso.id } },
+        });
+        if (!existsGeneric) {
+          const tarea = await this.tareaRepository.save(
+            this.tareaRepository.create({
+              titulo: `Inscripción: ${curso.nombre}`,
+              descripcion: `Revisar y aprobar la inscripción al curso "${curso.nombre}".`,
+              fechaVencimiento: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+              estado: EstadoTareaEntidad.PENDIENTE,
+              docente,
+              curso,
+              modulo: null,
+              leccion: null,
+            }),
+          );
+          await this.syncEntregasTarea(tarea, curso.estudiantes ?? []);
+        }
+      }
     }
+  }
+
+  async updateFechaVencimiento(docenteId: number, dto: UpdateFechaVencimientoDto) {
+    await this.assertDocente(docenteId);
+    const tarea = await this.tareaRepository.findOne({
+      where: { id: dto.tareaId, docente: { id: docenteId } },
+    });
+    if (!tarea) {
+      throw new NotFoundException('Tarea no encontrada o sin acceso');
+    }
+    tarea.fechaVencimiento = new Date(dto.fechaVencimiento);
+    await this.tareaRepository.save(tarea);
+    return { success: true, tareaId: tarea.id, fechaVencimiento: tarea.fechaVencimiento.toISOString() };
+  }
+
+  private async getLeccionesPendientesParaDocente(docenteId: number, cursoId?: number) {
+    const qb = this.leccionProgresoRepository
+      .createQueryBuilder('lp')
+      .innerJoinAndSelect('lp.leccion', 'leccion')
+      .innerJoinAndSelect('leccion.modulo', 'modulo')
+      .innerJoinAndSelect('modulo.curso', 'curso')
+      .innerJoinAndSelect('curso.docente', 'docente')
+      .innerJoinAndSelect('lp.estudiante', 'estudiante')
+      .innerJoinAndSelect('estudiante.user', 'user')
+      .where('docente.id = :docenteId', { docenteId })
+      .orderBy('lp.fechaSolicitud', 'DESC');
+
+    if (cursoId) {
+      qb.andWhere('curso.id = :cursoId', { cursoId });
+    }
+
+    const registros = await qb.getMany();
+
+    return registros.map((lp) => ({
+      tipo: 'leccion_completada' as const,
+      id: lp.id,
+      titulo: `Lección completada: ${lp.leccion?.titulo ?? ''}`,
+      descripcion: `${lp.estudiante?.user?.name ?? ''} ${lp.estudiante?.user?.lastName ?? ''} completó la lección "${lp.leccion?.titulo ?? ''}" del módulo "${lp.leccion?.modulo?.titulo ?? ''}"`,
+      estado: lp.estado,
+      leccionNombre: lp.leccion?.titulo,
+      moduloNombre: lp.leccion?.modulo?.titulo,
+      cursoNombre: lp.leccion?.modulo?.curso?.nombre,
+      cursoId: lp.leccion?.modulo?.curso?.id,
+      estudianteId: lp.estudiante?.id,
+      estudianteNombre: lp.estudiante?.user?.name ?? 'Estudiante',
+      estudianteApellido: lp.estudiante?.user?.lastName ?? '',
+      fechaSolicitud: lp.fechaSolicitud?.toISOString(),
+      fechaRevision: lp.fechaRevision?.toISOString() ?? null,
+      comentario: lp.comentario,
+      progresoId: lp.id,
+    }));
+  }
+
+  async revisarLeccionProgreso(docenteId: number, dto: RevisarLeccionProgresoDto) {
+    await this.assertDocente(docenteId);
+
+    const registro = await this.leccionProgresoRepository.findOne({
+      where: { id: dto.progresoId },
+      relations: [
+        'leccion',
+        'leccion.modulo',
+        'leccion.modulo.curso',
+        'leccion.modulo.curso.docente',
+        'estudiante',
+        'estudiante.user',
+        'estudiante.cursos',
+        'estudiante.cursos.modulos',
+        'estudiante.cursos.modulos.lecciones',
+      ],
+    });
+
+    if (!registro) {
+      throw new NotFoundException('Registro de progreso de lección no encontrado');
+    }
+    if (registro.leccion?.modulo?.curso?.docente?.id !== docenteId) {
+      throw new ForbiddenException('No tiene acceso a esta lección');
+    }
+
+    registro.estado =
+      dto.resultado === 'aprobado'
+        ? EstadoLeccionProgreso.APROBADO
+        : EstadoLeccionProgreso.RECHAZADO;
+    registro.comentario = dto.comentario ?? null;
+    registro.fechaRevision = new Date();
+
+    await this.leccionProgresoRepository.save(registro);
+
+    if (dto.resultado === 'aprobado') {
+      await this.recalcularProgresoEstudiante(registro.estudiante);
+    }
+
+    return {
+      success: true,
+      message:
+        dto.resultado === 'aprobado'
+          ? 'Lección aprobada. El estudiante puede avanzar a la siguiente lección.'
+          : 'Lección rechazada. El estudiante deberá repetirla.',
+      estado: registro.estado,
+      estudianteNombre: `${registro.estudiante?.user?.name ?? ''} ${registro.estudiante?.user?.lastName ?? ''}`.trim(),
+      leccionNombre: registro.leccion?.titulo,
+    };
+  }
+
+  private async recalcularProgresoEstudiante(estudiante: Estudiante) {
+    const estudianteConCursos = await this.estudianteRepository.findOne({
+      where: { id: estudiante.id },
+      relations: ['cursos', 'cursos.modulos', 'cursos.modulos.lecciones'],
+    });
+    if (!estudianteConCursos) return;
+
+    const totalLecciones = (estudianteConCursos.cursos ?? [])
+      .flatMap((c) => c.modulos ?? [])
+      .flatMap((m) => m.lecciones ?? [])
+      .length;
+
+    if (totalLecciones === 0) return;
+
+    const aprobadas = await this.leccionProgresoRepository.count({
+      where: {
+        estudiante: { id: estudiante.id },
+        estado: EstadoLeccionProgreso.APROBADO,
+      },
+    });
+
+    const nuevoProgreso = Math.min(100, Math.round((aprobadas / totalLecciones) * 100));
+    estudianteConCursos.progreso = nuevoProgreso;
+    await this.estudianteRepository.save(estudianteConCursos);
   }
 
   async calificarTarea(docenteId: number, dto: CalificarTareaDto) {
@@ -465,6 +792,15 @@ export class DocentePanelService {
           );
         }
         await this.estudianteRepository.save(estudianteConProgreso);
+
+        // Emitir WebSocket de progreso actualizado al estudiante y al docente
+        const cursoIds = (estudianteConProgreso.cursos ?? []).map(c => c.id);
+        this.progressGateway.emitProgresoActualizado(cursoIds, estudianteConProgreso.id, {
+          estudianteId: estudianteConProgreso.id,
+          progreso: estudianteConProgreso.progreso,
+          leccionesCompletadas: estudianteConProgreso.leccionesCompletadas.length,
+          leccionId: entrega.tarea.leccion.id,
+        });
       }
     }
 

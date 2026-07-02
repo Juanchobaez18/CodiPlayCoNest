@@ -1,6 +1,5 @@
 import { ApiProperty, PartialType } from "@nestjs/swagger";
-import { IsNumber, IsString, isString } from "class-validator";
-import { string } from "joi";
+import { IsNumber, IsString } from "class-validator";
 
 export class CreateLeccionesDto {
 @IsString()
@@ -15,9 +14,9 @@ descripcion: string;
 @ApiProperty()
 contenido: string;
 
-@IsString()
+@IsNumber()
 @ApiProperty()
-orden: string;
+orden: number;
 
   // 🔥 clave para relacionar con modulo
 @IsNumber()
