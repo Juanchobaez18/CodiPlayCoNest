@@ -488,20 +488,7 @@ export class DocentePanelService {
       order: { fechaVencimiento: 'DESC' },
     });
 
-    const filteredTareas = allTareas.map((tarea) => {
-      const pendingDeliveries = (tarea.entregas ?? []).filter(
-        (e) => e.estado === EstadoEntregaTarea.ENTREGADO,
-      );
-      if (pendingDeliveries.length === 0) {
-        return null;
-      }
-      return {
-        ...tarea,
-        entregas: pendingDeliveries,
-      };
-    }).filter((t): t is NonNullable<typeof t> => t !== null);
-
-    return filteredTareas.map((tarea) => this.mapTareaResponse(tarea));
+    return allTareas.map((tarea) => this.mapTareaResponse(tarea));
   }
 
   private async ensureTareasParaCursos(docenteId: number, cursoId?: number): Promise<void> {
