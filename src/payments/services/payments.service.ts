@@ -153,8 +153,8 @@ export class PaymentsService {
         },
       ],
       mode: 'payment',
-      success_url: `${frontendUrl}/pago-exitoso?session_id={CHECKOUT_SESSION_ID}&transaccion=${savedTransaction.id}`,
-      cancel_url: `${frontendUrl}/registro-pago/${createPaymentDto.courseId}?cancelado=true`,
+      success_url: `${frontendUrl}/#/pago-exitoso?session_id={CHECKOUT_SESSION_ID}&transaccion=${savedTransaction.id}`,
+      cancel_url: `${frontendUrl}/#/registro-pago/${createPaymentDto.courseId}?cancelado=true`,
       metadata: {
         transactionId: savedTransaction.id.toString(),
         estudianteId: estudiante.id.toString(),
