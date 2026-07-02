@@ -294,7 +294,8 @@ async marcarLeccionCompletada(userId: number, leccionId: number) {
 
     const yaCompletada = estudiante.leccionesCompletadas.find(l => l.id === leccionId);
     if (!yaCompletada) {
-        estudiante.leccionesCompletadas.push({ id: leccionId } as any);
+        estudiante.leccionesCompletadas = [...estudiante.leccionesCompletadas, { id: leccionId } as any];
+        await this.estudianteRepo.save(estudiante);
     }
 
     let totalLecciones = 0;
