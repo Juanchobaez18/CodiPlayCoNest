@@ -771,7 +771,7 @@ export class DocentePanelService {
         relations: ['leccionesCompletadas', 'cursos', 'cursos.modulos', 'cursos.modulos.lecciones'],
       });
       if (estudianteConProgreso) {
-        const completadas = estudianteConProgreso.leccionesCompletadas ?? [];
+        const completadas = estudianteConProgreso.leccionesCompletadas ? [...estudianteConProgreso.leccionesCompletadas] : [];
         const yaCompletada = completadas.find(
           (l) => l.id === entrega.tarea.leccion!.id,
         );
