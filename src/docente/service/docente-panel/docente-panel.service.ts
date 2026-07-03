@@ -485,10 +485,64 @@ export class DocentePanelService {
         'entregas.estudiante',
         'entregas.estudiante.user',
       ],
-      order: { fechaVencimiento: 'DESC' },
     });
 
-    return allTareas.map((tarea) => this.mapTareaResponse(tarea));
+    // Group tasks by curso to determine student progression per course
+    const tasksByCurso = new Map<number, Tarea[]>();
+    for (const t of allTareas) {
+      const cId = t.curso.id;
+      if (!tasksByCurso.has(cId)) tasksByCurso.set(cId, []);
+      tasksByCurso.get(cId)!.push(t);
+    }
+
+    // Filter entregas to only show the "current" task for each student
+    for (const [cId, tareas] of tasksByCurso.entries()) {
+      // Sort tasks by modulo order then leccion order
+      tareas.sort((a, b) => {
+        const modA = a.modulo?.orden ?? -1;
+        const modB = b.modulo?.orden ?? -1;
+        if (modA !== modB) return modA - modB;
+        const lecA = a.leccion?.orden ?? -1;
+        const lecB = b.leccion?.orden ?? -1;
+        return lecA - lecB;
+      });
+
+      // Find the active task for each student in this course
+      const activeTaskForStudent = new Map<number, number>(); // estudianteId -> tareaId
+
+      for (const t of tareas) {
+        for (const e of t.entregas ?? []) {
+          const estId = e.estudiante.id;
+          
+          // Initialize with the first task if not set yet (so they appear in Lesson 1 initially)
+          if (!activeTaskForStudent.has(estId)) {
+            activeTaskForStudent.set(estId, t.id);
+          }
+
+          // If the student has submitted or been graded on this task, it becomes their active task
+          if (e.estado !== EstadoEntregaTarea.NO_ENTREGADO) {
+            activeTaskForStudent.set(estId, t.id);
+          }
+        }
+      }
+
+      // Filter the entregas array of each task
+      for (const t of tareas) {
+        t.entregas = (t.entregas ?? []).filter(e => {
+          const activeTaskId = activeTaskForStudent.get(e.estudiante.id);
+          // Only keep the entrega if this task is the student's active task
+          return activeTaskId === t.id;
+        });
+      }
+    }
+
+    // Sort descending by date for the final response
+    allTareas.sort((a, b) => b.fechaVencimiento.getTime() - a.fechaVencimiento.getTime());
+
+    // Only return tasks that have at least one active student to avoid visual clutter
+    const activeTareas = allTareas.filter(t => (t.entregas?.length ?? 0) > 0);
+
+    return activeTareas.map((tarea) => this.mapTareaResponse(tarea));
   }
 
   private async ensureTareasParaCursos(docenteId: number, cursoId?: number): Promise<void> {
